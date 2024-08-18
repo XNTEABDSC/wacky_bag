@@ -1,0 +1,45 @@
+use crate::collections::typed_list::TypedList;
+
+
+pub trait Super {
+    fn draw(&self);
+}
+
+pub struct Sub{
+    a:usize,
+    b:usize
+}
+
+impl Super for Sub {
+    fn draw(&self) {
+        println!("{},{}",self.a,self.b);
+    }
+}
+
+pub struct Sub2{
+    a:usize,
+    b:usize,
+    c:usize
+}
+
+impl Super for Sub2 {
+    fn draw(&self) {
+        println!("{},{},{}",self.a,self.b,self.c);
+    }
+}
+#[test]
+fn it_works() {
+    let mut TL:TypedList<dyn Super>=TypedList::new();
+    let id1= TL.add(Box::new( Sub{a:1,b:1}));
+    let v=Sub{a:1,b:1};let _=v;
+    let id1= TypedList::<dyn Super>::add::<Sub>(&mut TL, v);//TL.add::<Sub>( v );
+    let id2=TL.add_boxed(Box::new(Sub2{a:1,b:2,c:3}));
+    let val1=TL.get(id1);
+    let val2=TL.get(id2);
+    val1.Draw();
+    val2.Draw();
+
+    let b_super:Box::<dyn Super> =Box::new(Sub{a:1,b:1});
+    let b_sub:Box<Sub> = unsafe{Box::from_raw(Box::into_raw(b_super) as *mut Sub)};
+    let _=b_sub;
+}
