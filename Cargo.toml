@@ -6,3 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+wacky_traits={path="../wacky_traits"}
+my_tuple={path="../my_tuple"}

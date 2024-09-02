@@ -3,5 +3,20 @@
 version = 3
 
 [[package]]
+name = "my_tuple"
+version = "0.2.0"
+dependencies = [
+ "wacky_traits",
+]
+
+[[package]]
 name = "wacky_bag"
 version = "0.1.0"
+dependencies = [
+ "my_tuple",
+ "wacky_traits",
+]
+
+[[package]]
+name = "wacky_traits"
+version = "1.0.0"

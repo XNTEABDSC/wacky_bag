@@ -4,6 +4,7 @@ use std::alloc::{self, Layout};
 use std::ops::{Deref, DerefMut};
 use std::{cmp, mem};
 use std::ptr::NonNull;
+use std::ptr::{self};
 
 pub struct RawVec<T> {
     ptr: NonNull<T>,
@@ -88,6 +89,28 @@ impl<T> RawVec<T> {
             None => alloc::handle_alloc_error(new_layout),
         };
         self.cap = new_cap;
+    }
+    pub fn remove(&mut self,index:usize)->T{
+        unsafe {
+            ptr::read(self.ptr.as_ptr().add(index))
+        }
+    }
+
+    pub fn drop(mut self,indexs:impl Iterator<Item = usize>){
+        for i in indexs {
+            let _= self.remove(i);
+            
+        }
+        let elem_size = mem::size_of::<T>();
+
+        if self.cap != 0 && elem_size != 0 {
+            unsafe {
+                alloc::dealloc(
+                    self.ptr.as_ptr() as *mut u8,
+                    Layout::array::<T>(self.cap).unwrap(),
+                );
+            }
+        }
     }
 }
 
