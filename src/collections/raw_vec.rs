@@ -1,6 +1,7 @@
 // from https://nomicon.purewhite.io/vec/vec-raw.html
 
 use std::alloc::{self, Layout};
+use std::mem::transmute;
 use std::ops::{Deref, DerefMut};
 use std::{cmp, mem};
 use std::ptr::NonNull;
@@ -142,6 +143,60 @@ impl<T> DerefMut for RawVec<T> {
     fn deref_mut(&mut self) -> &mut [T] {
         unsafe {
             std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.cap)
+        }
+    }
+}
+
+pub struct RawVecIter<'a,T,TIter>
+    where TIter:Iterator<Item = usize>
+{
+    vec:&'a RawVec<T>,
+    indexiter:TIter
+}
+impl<T> RawVec<T> {
+    pub fn make_iter<'a,TIter: std::iter::Iterator<Item = usize>>(&'a self,indexiter:TIter)->RawVecIter<'a,T,TIter>{
+        RawVecIter{vec:self,indexiter}
+    }
+}
+impl <'a,T,TIter> Iterator for RawVecIter<'a,T,TIter> 
+    where TIter:Iterator<Item = usize>
+{
+    type Item=&'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.indexiter.next() {
+            Some(x)=>Some(&self.vec[x]),
+            None=>None
+        }
+    }
+}
+
+pub struct RawVecIterMut<'a,T,TIter>
+    where TIter:Iterator<Item = usize>
+{
+    vec:&'a mut RawVec<T>,
+    indexiter:TIter
+}
+impl<T> RawVec<T> {
+    pub fn make_iter_mut<'a,TIter: std::iter::Iterator<Item = usize>>(&'a mut self,indexiter:TIter)->RawVecIterMut<'a,T,TIter>{
+        RawVecIterMut{vec:self,indexiter}
+    }
+}
+impl <'a,T,TIter> Iterator for RawVecIterMut<'a,T,TIter> 
+    where TIter:Iterator<Item = usize>
+{
+    type Item=&'a mut T;
+
+    fn next<'b>(&'b mut self) -> Option<Self::Item> {
+        match self.indexiter.next() {
+            Some(x)=>Some(
+                //&mut self.vec[x]
+                unsafe {
+                    //&mut (self.vec[x])
+                    transmute::<&'b mut T,&'a mut T>(&mut self.vec[x])
+                } 
+            ),
+            None=>None
         }
     }
 }

@@ -3,8 +3,14 @@
 version = 3
 
 [[package]]
+name = "lazy_static"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
+
+[[package]]
 name = "my_tuple"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "wacky_traits",
 ]
@@ -13,10 +19,11 @@ dependencies = [
 name = "wacky_bag"
 version = "0.1.0"
 dependencies = [
+ "lazy_static",
  "my_tuple",
  "wacky_traits",
 ]
 
 [[package]]
 name = "wacky_traits"
-version = "1.0.0"
+version = "2.0.0"
