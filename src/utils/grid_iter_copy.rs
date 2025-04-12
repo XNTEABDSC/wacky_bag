@@ -43,30 +43,19 @@ impl Ord for PointAndDistance {
     }
 }
 
-struct GridIterData{
-    pub grid_iter_checked_len:i32,
-    pub grid_iter_checked_cache:Vec<PointAndDistance>,
-    pub grid_iter_unchecked_len:BinaryHeap<PointAndDistance>,
-}
+static mut GRID_ITER_CHECKED_LEN:i32=-1;
+
+static mut GRID_ITER_CHECKED_CACHE:Vec<PointAndDistance>=Vec::<PointAndDistance>::new();
+
 lazy_static!{
-    static ref GRID_ITER_UNCHECKED_LEN_MUTEX: Mutex<GridIterData> =
-    Mutex::new( 
-        GridIterData{
-            grid_iter_unchecked_len:BinaryHeap::<PointAndDistance>::new(),
-            grid_iter_checked_len:-1,
-            grid_iter_checked_cache:Vec::<PointAndDistance>::new()
-        }
-    );
+    static ref GRID_ITER_UNCHECKED_LEN_MUTEX:
+    Mutex< BinaryHeap<PointAndDistance> >=Mutex::new( BinaryHeap::<PointAndDistance>::new() );
 }
 
 fn grow(needed:usize){
     unsafe {
-        let mut dwadwad=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
-        
-        //let mut grid_iter_unchecked_len=&mut dwadwad.grid_iter_unchecked_len;
-        //let mut grid_iter_checked_cache=&mut dwadwad.grid_iter_checked_cache;
-        //let mut grid_iter_checked_len=&mut dwadwad.grid_iter_checked_len;
-        if needed>=dwadwad.grid_iter_checked_cache.len(){
+        let mut grid_iter_unchecked_len=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
+        if needed>=GRID_ITER_CHECKED_CACHE.len(){
             fn get_lensq(p:&Point)->f32{
                 let x:f32=match p.0 {
                     0=>0f32,
@@ -78,13 +67,13 @@ fn grow(needed:usize){
                 };
                 return x*x+y*y;
             }
-            let new_grid_iter_checked_len=dwadwad.grid_iter_checked_len+1;
+            let new_grid_iter_checked_len=GRID_ITER_CHECKED_LEN+1;
             let mut y=0;
             while y<=new_grid_iter_checked_len {
                 let p=(new_grid_iter_checked_len,y);
                 let distsq=get_lensq(&p);
                 let dist=distsq.sqrt();
-                dwadwad.grid_iter_unchecked_len.push(PointAndDistance{
+                grid_iter_unchecked_len.push(PointAndDistance{
                     point:p,
                     distancesq:distsq,
                     distance:dist
@@ -93,20 +82,19 @@ fn grow(needed:usize){
             }
             let grid_iter_checked_len_f32=new_grid_iter_checked_len as f32;
             loop {
-                let v=dwadwad.grid_iter_unchecked_len.peek();
+                let v=grid_iter_unchecked_len.peek();
                 match v {
                     None=>break,
                     Some(x)=>{
                         if x.distance<=grid_iter_checked_len_f32 {
-                            let new_value=dwadwad.grid_iter_unchecked_len.pop().unwrap();
-                            dwadwad.grid_iter_checked_cache.push(new_value);
+                            GRID_ITER_CHECKED_CACHE.push(grid_iter_unchecked_len.pop().unwrap());
                         }else{
                             break;
                         }
                     }
                 }
             }
-            dwadwad.grid_iter_checked_len=new_grid_iter_checked_len;
+            GRID_ITER_CHECKED_LEN=new_grid_iter_checked_len;
         }
     }
 }
@@ -120,30 +108,22 @@ impl Iterator for GridIter {
         self.index=self.index+Wrapping(1);
         let i=self.index.0;
         unsafe {
-            let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
 
-            if i>=lock.grid_iter_checked_cache.len()
+            if i>=GRID_ITER_CHECKED_CACHE.len()
             {
-                drop(lock);
                 grow(i);
             }
-            else {
-                drop(lock);
-            }
-            let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
-            //GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap().grid_iter_checked_cache
-            let awd=lock.grid_iter_checked_cache.as_ptr();
-            drop(lock);
-            return awd.add(i).as_ref();
+            
+            return Option::Some( &GRID_ITER_CHECKED_CACHE[i]);
         }
         
     }
 }
 #[test]
-fn test_grid_iter_thread(){
+fn test(){
     use std::thread;
     let mut handles=Vec::new();
-    for i in 10..10000 {
+    for i in 100..10000 {
         handles.push(thread::spawn(move ||{
             let mut count=0;
             for p in GridIter::new() {
@@ -152,24 +132,12 @@ fn test_grid_iter_thread(){
                     break;
                 }
                 if i%100==0{
-                    println!("{},{}",p.point.0,p.point.1)
+                    //println!("{},{}",p.point.0,p.point.1)
                 }
             }
         }));
     }
     for handle in handles {
         handle.join().unwrap();
-    }
-}
-#[test]
-fn test_grid_iter(){
-
-    let mut count=0;
-    for p in GridIter::new() {
-        count+=1;
-        if count>=100 {
-            break;
-        }
-        println!("{},{}",p.point.0,p.point.1)
     }
 }

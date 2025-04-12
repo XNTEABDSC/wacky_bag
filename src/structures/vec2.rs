@@ -1,6 +1,13 @@
 use std::ops;
 
-
+use super::mvec::MVec;
+pub type Vec2<Num>=MVec<Num,2>;
+impl<Num> Vec2<Num> {
+    pub const fn new(x:Num,y:Num)->Self {
+        MVec([x,y])
+    }
+}
+/*
 #[derive(Default,Clone, Copy,PartialEq, Eq,Debug)]
 pub struct Vec2<Num>(pub Num,pub Num);
 
@@ -98,4 +105,4 @@ impl<Num> Vec2<Num> {
     {
         Self(-self.1,self.0)
     }
-}
+} */
