@@ -60,7 +60,7 @@ lazy_static!{
 }
 
 fn grow(needed:usize){
-    unsafe {
+    {
         let mut dwadwad=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
         
         //let mut grid_iter_unchecked_len=&mut dwadwad.grid_iter_unchecked_len;
@@ -119,23 +119,23 @@ impl Iterator for GridIter {
     fn next(&mut self) -> Option<Self::Item> {
         self.index=self.index+Wrapping(1);
         let i=self.index.0;
-        unsafe {
-            let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
+        let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
 
-            if i>=lock.grid_iter_checked_cache.len()
-            {
-                drop(lock);
-                grow(i);
-            }
-            else {
-                drop(lock);
-            }
-            let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
-            //GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap().grid_iter_checked_cache
-            let awd=lock.grid_iter_checked_cache.as_ptr();
+        if i>=lock.grid_iter_checked_cache.len()
+        {
             drop(lock);
-            return awd.add(i).as_ref();
+            grow(i);
         }
+        else {
+            drop(lock);
+        }
+        let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
+        //GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap().grid_iter_checked_cache
+        let awd=lock.grid_iter_checked_cache.as_ptr();
+        drop(lock);
+        return unsafe {
+             awd.add(i).as_ref()
+        };
         
     }
 }
