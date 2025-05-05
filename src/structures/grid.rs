@@ -2,6 +2,8 @@ use std::{array, ops::{Index, IndexMut}};
 
 use super::counted_iter::CountedIterator;
 
+///
+/// values[y][x]
 pub struct Grid2D<Container>
     where Container:
     /*
