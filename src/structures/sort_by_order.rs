@@ -149,7 +149,7 @@ impl<'a,TKey:Eq+Hash+'a,TValue> SortByOrderWithKV<'a,TKey,TValue>
         self.sbo.add_order(aid,bid);
     }
 
-    pub fn get_res<'b>(&'b mut self)->impl Iterator<Item = &TValue>+'b{
+    pub fn get_res<'b>(&'b mut self)->impl Iterator<Item = &'b TValue>{
         let res= self.sbo.get_res() .iter().filter_map( |id:& 'b usize| {
             match &self.id_to_value_list[*id] {
                 Some(v)=>Some(v),
