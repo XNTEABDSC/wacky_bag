@@ -1,4 +1,4 @@
-use std::{array, ops::{Index, IndexMut}};
+use std::ops::{Index, IndexMut};
 
 use super::counted_iter::CountedIterator;
 
