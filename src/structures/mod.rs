@@ -6,5 +6,6 @@ pub mod vec2;
 pub mod counted_iter;
 pub mod mvec;
 pub mod state;
-pub mod doubly_grid;
+pub mod doubly_grid_layers;
+pub mod cached_iter;
 //pub mod tuple;
