@@ -37,7 +37,7 @@ impl<Key,Value> Trie<Key,Value>
             Some(self)
         }
     }
-
+    /*
     fn travel_make(&mut self,mut index:impl Iterator<Item = Key>)->&mut Trie<Key,Value> {
         let key_=index.next();
         if let Some(key)=key_{
@@ -57,7 +57,7 @@ impl<Key,Value> Trie<Key,Value>
         }else {
             self
         }
-    }
+    } */
 
     pub fn insert(&mut self,mut index:impl Iterator<Item = Key>,value:Value)->Option<Value>{
         let key_=index.next();
