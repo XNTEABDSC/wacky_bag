@@ -1,64 +1,79 @@
-use std::ops::Range;
+use std::{array, ops::{Range, RangeInclusive}};
 
-use crate::structures::mvec::MVec;
+use crate::{structures::{doubly_slice_layers::{doubly_slice_layers_overlap, find_range_at_doubly_slice_i, DoublySliceIndex}, mvec::MVec, n_dim_index::NDimIndexer, n_dim_vec::NDimArray}, utils::range_inclusive_upper_convert::range_inclusive_convert_cover};
+pub struct DoublyGridIndex<const DIM:usize>{
+    pub layer:isize,pub pos:MVec<isize,DIM>
+}
+pub type DoublyGrid2DIndex=DoublyGridIndex<2>;
 
-
-pub struct DoublyGrid2DLayers<T>{
-    pub values:Vec<Vec<Vec<T>>>
+pub struct DoublyGridLayers<const DIM:usize,T>{
+    pub values:Vec<NDimArray<DIM,T>>
 }
 
-impl<T> DoublyGrid2DLayers<T> {
-    pub fn new(width:i32,height:i32,mut genfn:impl FnMut(i32,i32,i32)->T)->Self{
-        let mut grid_len=1;
-        let mut values:Vec<Vec<Vec<T>>>=Vec::new();
+impl<T,const DIM:usize> DoublyGridLayers<DIM,T> {
+    pub fn new(mut lens:[RangeInclusive<isize>;DIM],mut genfn:impl FnMut(DoublyGridIndex<DIM>)->T)->Self {
+        let mut values:Vec<NDimArray<DIM,T>>=Vec::new();
+        let mut layer_index=0;
+        
         loop {
-            
-            let mut gridy:Vec<Vec<T>>=Vec::new();
-            let mut y=0;
-            let mut ymax=height/grid_len;
-            let mut xmax=width/grid_len;
-
-            if ymax*grid_len<height{ymax=ymax+1}
-            if xmax*grid_len<width{xmax=xmax+1}
-
-            while y<ymax {
-                
-                let mut gridx:Vec<T>=Vec::new();
-                let mut x = 0;
-                while x<xmax {
-                    gridx.push(genfn(grid_len,y,x));
-                    x+=1;
-                }
-                gridy.push(gridx);
-                y+=1;
-            }
-            values.push(gridy);
-
-            if ymax==1&&xmax==1{
+            let indexer=NDimIndexer::new_len(lens.clone().map(|v|{
+                let inner=v.into_inner();
+                inner.0..(inner.1+1)
+            }));
+            let layer_values=NDimArray::from_fn(indexer, |index|genfn(DoublyGridIndex { layer: layer_index, pos: index }));
+            values.push(layer_values);
+            if lens.iter().all(|v|(v.end()-v.start()+1)<=1) {
                 break;
             }
-            grid_len=grid_len*2;
+            layer_index+=1;
+            lens=lens.map(|v|{
+                let (l,r)=v.clone().into_inner();
+                (l.div_euclid(2))..=(r.div_euclid(2)+r.rem_euclid(2))
+            })
         }
-        return Self{values};
+        Self { values: values }
+    }
+
+    pub fn get_doubly_grid_index(&self,index:DoublyGridIndex<DIM>)->Option<&T> {
+        self.values.get(index.layer as usize).map_or(None, 
+            |values| values.get(index.pos))
+    }
+    pub fn get_mut_doubly_grid_index(&mut self,index:DoublyGridIndex<DIM>)->Option<&mut T> {
+        self.values.get_mut(index.layer as usize).map_or(None, 
+            |values| values.get_mut(index.pos))
     }
 }
 
-pub fn doubly_grid2d_layers_interacts(target_layer:i32,target_x:i32,target_y:i32,current_layer:i32)->MVec<Range<i32>,2>{
-    let layer_dif=current_layer-target_layer;
-    let target_x2=target_x+1;
-    let target_y2=target_y+1;
-    
-    let new_x=target_x>>layer_dif;
-    let new_y=target_y>>layer_dif;
-    if layer_dif>=0{
-        let new_x2=new_x+1;
-        let new_y2=new_y+1;
-        return MVec::new(Range { start: new_x, end: new_x2 }, Range { start: new_y, end: new_y2 });
 
-    }else {
-        let new_x2=target_x2>>layer_dif;
-        let new_y2=target_y2>>layer_dif;
-        return MVec::new(Range { start: new_x, end: new_x2 }, Range { start: new_y, end: new_y2 });
-    }
+
+pub fn find_doubly_grid_layers_overlap<const DIM:usize>(target:DoublyGridIndex<DIM>,current_layer:isize)->MVec<Range<isize>,DIM>{
+    //target_layer:i32,target_x:i32,target_y:i32
+    return MVec(array::from_fn(|i|doubly_slice_layers_overlap(DoublySliceIndex{layer:target.layer,pos:target.pos[i]}, current_layer)));
 }
 
+
+/// find the minimun `DoublyGridIndex` which covers `rect`
+pub fn find_rect_object_at_doubly_grid_layers<const DIM:usize,Num>(rect:MVec<RangeInclusive<Num>,DIM>)->DoublyGridIndex<DIM>
+    where Num:Into<isize>
+{
+    find_rect_object_at_doubly_grid_layers_i::<DIM>(MVec(
+        rect.0.map(|v|{
+            
+            range_inclusive_convert_cover(v)
+        })
+    ))
+}
+
+/// for i32, find the minimun `DoublyGridIndex` which covers `rect`
+pub fn find_rect_object_at_doubly_grid_layers_i<const DIM:usize>(rect:MVec<RangeInclusive<isize>,DIM>)->DoublyGridIndex<DIM>
+{
+    let slices: [DoublySliceIndex; DIM]=rect.0.map(|range|{find_range_at_doubly_slice_i(range)});// array::from_fn(|i|find_range_at_doubly_slice_i32(rect[i]));
+    let mut max_layer=0;
+    slices.iter().for_each(|v|{if v.layer>max_layer{max_layer=v.layer}});
+    return DoublyGridIndex{
+        layer:max_layer,
+        pos:MVec(array::from_fn(|i|{
+            doubly_slice_layers_overlap(slices[i], max_layer).start
+        }))
+    };
+}

@@ -2,6 +2,7 @@
 pub mod grid_iter;
 pub mod array_utils;
 pub mod loop_wrap;
+pub mod range_inclusive_upper_convert;
 //pub mod grid_iter_copy;
 
 use crate::collections::raw_vec::RawVec;

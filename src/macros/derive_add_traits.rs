@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! derive_add_traits {
-    ($T:ident) => {
+    ($T:ty) => {
         
 
 impl std::ops::Add for $T {

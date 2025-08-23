@@ -1,18 +1,27 @@
 
 use std::{array, ops::{self, Index, IndexMut}};
 
+use ndarray::Array2;
 
+pub type MVec<Num,const DIM:usize>=ndarray::Array<Num,ndarray::Dim<[usize;1]>>;
+#[test]
+fn test(){
+    let mut avec=Array2::zeros((3, 2));
+    avec[[0,0]]=1;
+
+}
+/*
 #[derive(Clone, Copy,PartialEq, Eq,Debug)]
-pub struct MVec<Num,const N:usize>(pub [Num;N]);
+pub struct MVec<Num,const DIM:usize>(pub [Num;DIM]);
 
-impl<Num,const N:usize> MVec<Num,N> {
-    /*
-    pub const fn new(arr:[Num;N])->Self {
+impl<Num,const DIM:usize> MVec<Num,DIM> {
+    
+    pub const fn new(arr:[Num;DIM])->Self {
         MVec(arr)
-    } */
+    } 
 }
 
-impl<Num: Default,const N:usize> Default for MVec<Num,N>  {
+impl<Num: Default,const DIM:usize> Default for MVec<Num,DIM>  {
     fn default() -> Self {
         Self(array::from_fn(|_|{Default::default()}))
     }
@@ -24,12 +33,7 @@ impl<Num: std::ops::Add<Output = Num>,const N:usize> ops::Add for MVec<Num,N> {
     fn add(self, rhs: Self) -> Self::Output {
         
         let newarr=crate::utils::array_utils::array_from_2arr(self.0, rhs.0, |a,b|{a+b});
-        /*
-        let mut aiter=self.0.into_iter();
-        let mut biter=rhs.0.into_iter();
-        let newarr=array::from_fn(|i|{
-            aiter.next().unwrap()+biter.next().unwrap()
-        }); */
+
         return MVec(newarr);
     }
 }
@@ -37,7 +41,7 @@ impl<Num: std::ops::Add<Output = Num>,const N:usize> ops::Add for MVec<Num,N> {
 impl<Num: std::ops::AddAssign,const N:usize> ops::AddAssign for MVec<Num,N> {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
-        self.0.iter_mut().zip(rhs.0.into_iter()).for_each(|(a,b)|{*a+=b});
+        self.0.iter_mut().zip(rhs.0.into_iter()).for_each(|(mut a,b)|{*a+=b});
     }
 }
 
@@ -113,7 +117,7 @@ impl<Num:ops::Sub<Output = Num>,const N:usize> ops::Sub for MVec<Num,N> {
 impl<Num:ops::SubAssign,const N:usize> ops::SubAssign for MVec<Num,N> {
     #[inline]
     fn sub_assign(&mut self, rhs: Self) {
-        self.0.iter_mut().zip(rhs.0.into_iter()).for_each(|(a,b)|{*a-=b})
+        self.0.iter_mut().zip(rhs.0.into_iter()).for_each(|(mut a,b)|{*a-=b})
     }
 }
 impl<Num,const N:usize> Index<usize> for MVec<Num,N>  {
@@ -143,3 +147,4 @@ impl<Num> MVec<Num> {
         
     }
  } */
+   */
