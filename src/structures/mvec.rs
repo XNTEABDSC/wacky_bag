@@ -1,16 +1,17 @@
 
 use std::{array, ops::{self, Index, IndexMut}};
-
+use ndarray::array;
 use ndarray::Array2;
 
-pub type MVec<Num,const DIM:usize>=ndarray::Array<Num,ndarray::Dim<[usize;1]>>;
+//pub type MVec<Num,const DIM:usize>=[Num;DIM];
+
+//pub type MVec<Num,const DIM:usize>=ndarray::Array<Num,ndarray::Dim<[usize;1]>>;
 #[test]
 fn test(){
-    let mut avec=Array2::zeros((3, 2));
-    avec[[0,0]]=1;
+    let mut avec: ndarray::ArrayBase<ndarray::OwnedRepr<i32>, ndarray::Dim<[usize; 2]>>=array![[1,2,3],[2,3,4]];
 
 }
-/*
+
 #[derive(Clone, Copy,PartialEq, Eq,Debug)]
 pub struct MVec<Num,const DIM:usize>(pub [Num;DIM]);
 
@@ -147,4 +148,4 @@ impl<Num> MVec<Num> {
         
     }
  } */
-   */
+   
