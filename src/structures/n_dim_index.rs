@@ -2,10 +2,10 @@ use std::{array, ops::Range};
 
 //use ndarray::Array1;
 
-use crate::structures::mvec::MVec;
+use crate::structures::cvec::CVec;
 
 
-pub type NDimIndex<const DIM:usize>=MVec<isize,DIM>;
+pub type NDimIndex<const DIM:usize>=CVec<isize,DIM>;
 
 /// convert indexes with N dimensions in range and usize
 pub struct NDimIndexer<const DIM:usize>{
@@ -49,7 +49,7 @@ impl<'a,const N:usize> Iterator for NDimIndexIter<'a,N> {
                 break;
             }
         }
-        return Some(MVec(res));
+        return Some(CVec(res));
     }
 }
 
@@ -116,7 +116,7 @@ impl<const DIM:usize> NDimIndexer<DIM>{
             }
             i-=1;
         }
-        MVec(res)
+        CVec(res)
     }
     pub fn iter<'a>(&'a self)->NDimIndexIter<'a,DIM> {
         NDimIndexIter::new(&self.lens)
@@ -151,7 +151,7 @@ impl<const DIM:usize> NDimIndexer<DIM>{
 #[test]
 fn test() {
     let a_ndidxer=NDimIndexer::new_len([-5..5,-5..5,-5..5]);
-    let a_ndidx=MVec([-2,0,2]);
+    let a_ndidx=CVec([-2,0,2]);
     let a_cidx=a_ndidxer.compress_index_u(a_ndidx);
     println!("{:?}",a_ndidxer.starts());
     println!("{:?}",a_ndidxer.steps());
