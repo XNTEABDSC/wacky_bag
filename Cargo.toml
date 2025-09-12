@@ -9,4 +9,4 @@ edition = "2024"
 # wacky_traits={path="../wacky_traits"}
 # my_tuple={path="../my_tuple"}
 lazy_static = "1.5.0"
-ndarray = "0.16.1"
+wacky_bag_macro = { path = "./wacky_bag_macro" }

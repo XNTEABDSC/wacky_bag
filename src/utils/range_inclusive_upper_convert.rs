@@ -7,5 +7,5 @@ pub fn range_inclusive_convert_cover<Num>(rangei:RangeInclusive<Num>)->RangeIncl
     
     let inner=rangei.into_inner();
     (inner.0.into())..=
-    (inner.1.into()+1)
+    (inner.1.into())
 }

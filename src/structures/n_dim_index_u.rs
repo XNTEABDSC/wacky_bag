@@ -1,9 +1,8 @@
 use std::array;
 
-use crate::structures::cvec::CVec;
 
 
-pub type NDimIndexU<const DIM:usize>=CVec<usize,DIM>;
+pub type NDimIndexU<const DIM:usize>=[usize;DIM];
 pub struct NDimIndexerU<const DIM:usize>{
     steps:[usize;DIM],
     length:usize,
@@ -44,7 +43,7 @@ impl<'a,const DIM:usize> Iterator for NDimIndexUIter<'a,DIM> {
                 break;
             }
         }
-        return Some(CVec(res));
+        return Some(res);
     }
 }
 
@@ -81,7 +80,7 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
             }
             i-=1;
         }
-        CVec(res)
+        res
     }
     pub fn iter<'a>(&'a self)->NDimIndexUIter<'a,DIM> {
         NDimIndexUIter::new(&self.lens)
@@ -91,21 +90,21 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
 #[test]
 fn test() {
     let a_compress_index=NDimIndexerU::new_len([10,10,10]);
-    let a_compresss_1=a_compress_index.compress_index(CVec([1,2,3]));
+    let a_compresss_1=a_compress_index.compress_index([1,2,3]);
     assert_eq!(a_compresss_1,321);//println!("{}",a_compresss_1);
 
     let a_seperated=a_compress_index.seperate_index(a_compresss_1);
-    assert_eq!(a_seperated,CVec([1,2,3]));//println!("{:?}",a_seperated);
+    assert_eq!(a_seperated,[1,2,3]);//println!("{:?}",a_seperated);
 
     let b_compress_index=NDimIndexerU::new_len([1,2,3]);
     let b_compress_index_iter=b_compress_index.iter();
-    assert_eq!(b_compress_index_iter.collect::<Vec<CVec<usize,3>>>(),vec![
-        CVec([0, 0, 0]),
-        CVec([0, 1, 0]),
-        CVec([0, 0, 1]),
-        CVec([0, 1, 1]),
-        CVec([0, 0, 2]),
-        CVec([0, 1, 2])
+    assert_eq!(b_compress_index_iter.collect::<Vec<[usize;3]>>(),vec![
+        [0, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+        [0, 1, 1],
+        [0, 0, 2],
+        [0, 1, 2]
     ]);
     // for b_compress_index in b_compress_index_iter {
     //     println!("{:?}",b_compress_index)

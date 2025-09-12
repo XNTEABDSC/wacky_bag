@@ -2,16 +2,16 @@ use std::{array, ops::Range};
 
 //use ndarray::Array1;
 
-use crate::structures::cvec::CVec;
 
 
-pub type NDimIndex<const DIM:usize>=CVec<isize,DIM>;
+pub type NDimIndex<const DIM:usize>=[isize;DIM];
 
 /// convert indexes with N dimensions in range and usize
 pub struct NDimIndexer<const DIM:usize>{
     starts:[isize;DIM],
     steps:[isize;DIM],
     range:Range<isize>,
+    range_u:usize,
     lens:[Range<isize>;DIM],
 }
 
@@ -25,8 +25,8 @@ impl<'a,const DIM:usize> NDimIndexIter<'a,DIM> {
     pub fn new(lens:&'a [Range<isize>;DIM])->Self{Self{lens,cur:array::from_fn(|i|lens[i].start),ended:false}}
 }
 
-impl<'a,const N:usize> Iterator for NDimIndexIter<'a,N> {
-    type Item=NDimIndex<N>;
+impl<'a,const DIM:usize> Iterator for NDimIndexIter<'a,DIM> {
+    type Item=NDimIndex<DIM>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.ended{
@@ -49,7 +49,7 @@ impl<'a,const N:usize> Iterator for NDimIndexIter<'a,N> {
                 break;
             }
         }
-        return Some(CVec(res));
+        return Some(res);
     }
 }
 
@@ -94,8 +94,25 @@ impl<const DIM:usize> NDimIndexer<DIM>{
         let (starts,steps)=(array::from_fn(|i|calc[i].0),array::from_fn(|i|calc[i].1));
         */
 
-        Self{starts,steps,range:last_range,lens}
+        Self{starts,steps,range:last_range.clone(),lens,range_u:(last_range.end-last_range.start) as usize}
     }
+    
+    pub fn contains(&self,indexes:NDimIndex<DIM>)->bool{
+        //let mut pass=true;
+        for i in 0..DIM {
+            if self.lens[i].contains(&indexes[i]){
+                //pass=true
+            }else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    pub fn contains_compressed_u(&self,index:usize)->bool{
+        0<=index&&index<self.range_u
+    }
+    
     pub fn compress_index_u(&self,indexes:NDimIndex<DIM>)->usize{
         let mut res:usize=0;
         for i in 0..DIM {
@@ -103,7 +120,7 @@ impl<const DIM:usize> NDimIndexer<DIM>{
         }
         res
     }
-    pub fn seperate_index_u(&self,mut compressed_index:usize)->NDimIndex<DIM> {
+    pub fn decompress_index_u(&self,mut compressed_index:usize)->NDimIndex<DIM> {
         let mut res=[0;DIM];
         let mut i=DIM-1;
         loop{
@@ -116,7 +133,7 @@ impl<const DIM:usize> NDimIndexer<DIM>{
             }
             i-=1;
         }
-        CVec(res)
+        res
     }
     pub fn iter<'a>(&'a self)->NDimIndexIter<'a,DIM> {
         NDimIndexIter::new(&self.lens)
@@ -151,13 +168,13 @@ impl<const DIM:usize> NDimIndexer<DIM>{
 #[test]
 fn test() {
     let a_ndidxer=NDimIndexer::new_len([-5..5,-5..5,-5..5]);
-    let a_ndidx=CVec([-2,0,2]);
+    let a_ndidx=[-2,0,2];
     let a_cidx=a_ndidxer.compress_index_u(a_ndidx);
     println!("{:?}",a_ndidxer.starts());
     println!("{:?}",a_ndidxer.steps());
     println!("{:?}",a_cidx);
-    let a_scidx=a_ndidxer.seperate_index_u(a_cidx);
-    println!("{:?}",a_scidx)
+    let a_scidx=a_ndidxer.decompress_index_u(a_cidx);
+    println!("{:?}",a_scidx);
     
     // for b_compress_index in b_compress_index_iter {
     //     println!("{:?}",b_compress_index)
