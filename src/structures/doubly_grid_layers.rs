@@ -1,4 +1,4 @@
-use std::{array, cell::Cell, ops::{Range, RangeInclusive}};
+use std::{array, ops::{Range, RangeInclusive}};
 
 use crate::{structures::{doubly_slice_layers::{DoublySliceIndex, doubly_slice_layers_overlap, find_range_at_doubly_slice_i}, just::Just, n_dim_array::NDimArray, n_dim_index::NDimIndexer}, utils::range_inclusive_upper_convert::range_inclusive_convert_cover};
 pub struct DoublyGridIndex<const DIM:usize>{
@@ -14,7 +14,7 @@ pub struct DoublyGridLayers<const DIM:usize,T>{
 
 impl<T,const DIM:usize> DoublyGridLayers<DIM,T> {
     pub fn new(mut lens:[RangeInclusive<isize>;DIM],mut genfn:impl FnMut(DoublyGridIndex<DIM>)->T)->Self {
-        let mut values=Vec::new();
+        let values=Vec::new();
         //let mut indexers=Vec::new();
         let mut layer_index=0;
 

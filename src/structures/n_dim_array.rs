@@ -1,6 +1,6 @@
 use std::{array, ops::{Deref, Index, IndexMut}};
 
-use crate::{structures::n_dim_index::{NDimIndex, NDimIndexIter, NDimIndexer}, traits::scope};
+use crate::{structures::n_dim_index::{NDimIndex, NDimIndexer}, traits::scope::{self, ScopeCreator, ScopeUser}};
 
 #[derive(Debug)]
 pub struct NDimArray<TIndexerIter,const DIM:usize,T,Storage>
@@ -303,6 +303,44 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
     }
 
 
+    pub fn parallel_iter_pair_mut<'env,Func,TScopeCreator>(&'env mut self,mut func:Func,mut scope_creator:TScopeCreator)
+        where Func: FnMut(&'env mut T,&'env mut T,usize),
+        TScopeCreator:ScopeCreator
+    {
+        for mut_dim in 0..DIM {
+
+            struct AScopeUser<'env,Func,TIndexerIter,const DIM:usize,T,Storage>
+                where TIndexerIter:Deref<Target = NDimIndexer<DIM>>,
+                Storage:Index<usize,Output=T>+IndexMut<usize>
+            {
+                values:&'env mut NDimArray<TIndexerIter,DIM,T,Storage>,
+                mut_dim:usize,
+                func:&'env mut Func,
+                plus_1:bool,
+            };
+            impl<'env,Func,TIndexerIter,const DIM:usize,T,Storage> ScopeUser<'env> for AScopeUser<'env,Func,TIndexerIter,DIM,T,Storage> 
+                where TIndexerIter:Deref<Target = NDimIndexer<DIM>>,
+                Storage:Index<usize,Output=T>+IndexMut<usize>
+            {
+                type Output=();
+            
+                fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->Self::Output
+                    where TScope:'scope+scope::Scope<'scope,()>,
+                        'env:'scope {
+                    
+                }
+                
+                type ScopeFnOutput=();
+            }
+
+            scope_creator.scope(
+                AScopeUser{values:self,mut_dim,func:&mut func,plus_1:false}
+            );
+            scope_creator.scope(
+                AScopeUser{values:self,mut_dim,func:&mut func,plus_1:true}
+            );
+        }
+    }
     // pub fn parallel_iter_pair_mut<'a,Func,ScopeCreator,Scope>(&'a mut self,func:Func,mut scope_creator:ScopeCreator)
     //     where Func:Fn(&'a mut T,&'a mut T,usize,bool),
     //     ScopeCreator:FnMut( Fn(Scope)  ),
@@ -311,13 +349,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
     //     std::thread::spawn(f)
     // }
 
-    pub fn iter_pair_mut<'a,Func>(&'a mut self,func:Func)
-        where Func:for<'scope> FnMut(&'scope mut T,&'scope mut T,usize)
-    {
-        for pair_dim in 0..DIM{
-
-        }
-    }
+    
 }
 
 #[derive(Debug)]
@@ -340,7 +372,6 @@ pub struct NDimArrayGetMutWithNeiborhoodsMutResult<'a,const DIM:usize,T>{
 
 #[cfg(test)]
 mod test{
-    use std::cell::RefCell;
 
     use crate::structures::{n_dim_array::{NDimArray}, n_dim_index::NDimIndexer};
 
