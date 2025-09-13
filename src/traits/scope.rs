@@ -1,6 +1,6 @@
 use std::thread;
 
-pub trait Scope<'scope,ScopeFnOutput:Send+'scope>{
+pub trait Scope<'scope,ScopeFnOutput:'scope>{
 
     fn spawn<F>(&'scope self, f: F) ->()
         where
@@ -8,10 +8,10 @@ pub trait Scope<'scope,ScopeFnOutput:Send+'scope>{
     
 }
 
-impl<'scope,'env,FRet:Send+'scope> Scope<'scope,FRet> for thread::Scope<'scope,'env> {
+impl<'scope,'env,ScopeFnOutput:Send+'scope> Scope<'scope,ScopeFnOutput> for thread::Scope<'scope,'env> {
     fn spawn<F>(&'scope self, f: F) -> ()
         where
-            F: FnOnce()->FRet + std::marker::Send + 'scope 
+            F: FnOnce()->ScopeFnOutput + std::marker::Send + 'scope 
     {
         self.spawn(f);
     }
@@ -19,7 +19,7 @@ impl<'scope,'env,FRet:Send+'scope> Scope<'scope,FRet> for thread::Scope<'scope,'
 }
 
 pub trait ScopeUser<'env> {
-    type ScopeFnOutput:Send+'env;
+    type ScopeFnOutput:'env;
     type Output;
     fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->Self::Output
         where TScope:'scope+Scope<'scope,Self::ScopeFnOutput>,
@@ -27,30 +27,33 @@ pub trait ScopeUser<'env> {
 }
 
 
-pub trait ScopeCreator {
+pub trait ScopeCreator<Output,ScopeFnOutput> {
     
-    type Output <'env,F> where F: ScopeUser<'env> + 'env;
+    type Output <'env,F> 
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>;
 
     //type Scope<'scope,'env:'scope>:Scope<'scope>+'scope;
 
     fn scope<'env,F>(&mut self,f:F ) -> Self::Output<'env,F>
-        where F: ScopeUser<'env> + 'env,
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
             //'env:'scope
         ;
 }
 
 pub struct StdScopeCreator;
 
-impl ScopeCreator for StdScopeCreator {
+impl<Output,ScopeFnOutput:Send> ScopeCreator<Output,ScopeFnOutput> for StdScopeCreator {
     //type Scope<'scope,'env:'scope> = thread::Scope<'scope,'env>;
     
     fn scope<'env,F>(&mut self,f:F )-> Self::Output<'env,F>
-        where F: ScopeUser<'env> + 'env,
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
     {
         thread::scope(|scope: &thread::Scope<'_, '_>|f.use_scope(scope))
     }
     
-    type Output <'env,F>  = <F as ScopeUser<'env>>::Output where F: ScopeUser<'env> + 'env;
+    type Output <'env,F> = <F as ScopeUser<'env>>::Output
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>;
+    
     
     //type Output<'scope,'env:'scope,F:'scope + ScopeUser<'env> + 'env > = <F as ScopeUser<'env>>::Output;
 }

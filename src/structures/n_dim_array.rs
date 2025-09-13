@@ -303,19 +303,20 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
     }
 
 
-    pub fn parallel_iter_pair_mut<'env,Func,TScopeCreator>(&'env mut self,mut func:Func,mut scope_creator:TScopeCreator)
-        where Func: FnMut(&'env mut T,&'env mut T,usize),
-        TScopeCreator:ScopeCreator
+    
+    pub fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,mut func:Func,mut scope_creator:TScopeCreator)
+        where Func: FnMut(&'ext_env mut T,&'ext_env mut T,usize)+'ext_env,
+        TScopeCreator: ScopeCreator<(),()>
     {
         for mut_dim in 0..DIM {
 
-            struct AScopeUser<'env,Func,TIndexerIter,const DIM:usize,T,Storage>
+            struct AScopeUser<'scope,Func,TIndexerIter,const DIM:usize,T,Storage>
                 where TIndexerIter:Deref<Target = NDimIndexer<DIM>>,
                 Storage:Index<usize,Output=T>+IndexMut<usize>
             {
-                values:&'env mut NDimArray<TIndexerIter,DIM,T,Storage>,
+                values:&'scope mut NDimArray<TIndexerIter,DIM,T,Storage>,
                 mut_dim:usize,
-                func:&'env mut Func,
+                func:&'scope mut Func,
                 plus_1:bool,
             };
             impl<'env,Func,TIndexerIter,const DIM:usize,T,Storage> ScopeUser<'env> for AScopeUser<'env,Func,TIndexerIter,DIM,T,Storage> 
@@ -327,7 +328,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
                 fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->Self::Output
                     where TScope:'scope+scope::Scope<'scope,()>,
                         'env:'scope {
-                    
+                    todo!()
                 }
                 
                 type ScopeFnOutput=();
