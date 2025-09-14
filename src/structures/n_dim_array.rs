@@ -174,7 +174,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
                 return ((res_0,nindex_0),(res_1,nindex_1));
 
             });
-            return Some(NDimArrayGetMutWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
+            return Some(NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
         }else {
             return None;
         }
@@ -216,7 +216,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
                 return ((res_0,nindex_0),(res_1,nindex_1));
 
             });
-            return Some(NDimArrayGetMutWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
+            return Some(NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
         }else {
             return None;
         }
@@ -252,7 +252,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
                 return ((res_0,nindex_0),(res_1,nindex_1));
 
             });
-            return Some(NDimArrayGetMutWithNeiborhoodsMutResult { cur: res_cur, neiborhoods: res_neiborhoods });
+            return Some(NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
         }else {
             return None;
         }
@@ -294,7 +294,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
                 return ((res_0,nindex_0),(res_1,nindex_1));
 
             });
-            return Some(NDimArrayGetMutWithNeiborhoodsMutResult { cur: res_cur, neiborhoods: res_neiborhoods });
+            return Some(NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
         }else {
             return None;
         }
