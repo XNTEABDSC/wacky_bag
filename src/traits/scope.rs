@@ -1,76 +1,105 @@
 use std::thread;
 
-pub trait Scope<'scope>{
-    fn spawn<F>(&'scope self, f: F) -> ()
+pub trait Scope<'scope,ScopeFnOutput:'scope>{
+
+    fn spawn<F>(&'scope self, f: F) ->()
         where
-            F: FnOnce() + std::marker::Send + 'scope;
+            F: FnOnce()->ScopeFnOutput + std::marker::Send + 'scope;
     
 }
 
-impl<'scope,'env> Scope<'scope> for thread::Scope<'scope,'env> {
+impl<'scope,'env,ScopeFnOutput:Send+'scope> Scope<'scope,ScopeFnOutput> for thread::Scope<'scope,'env> {
     fn spawn<F>(&'scope self, f: F) -> ()
         where
-            F: FnOnce() + std::marker::Send + 'scope {
+            F: FnOnce()->ScopeFnOutput + std::marker::Send + 'scope 
+    {
         self.spawn(f);
     }
+
 }
 
-pub trait ScopeCreator {
+pub trait ScopeUser<'env> {
+    type ScopeFnOutput:'env;
+    type Output;
+    fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->Self::Output
+        where TScope:'scope+Scope<'scope,Self::ScopeFnOutput>,
+            'env:'scope;
+}
 
-    type Scope<'scope,'env:'scope>:Scope<'scope>+'scope;
 
-    fn scope<'env,F,T>(&mut self,f:F )->T
-        where F: for<'scope> FnOnce(&'scope Self::Scope<'scope,'env>) -> T,
-            F:'env
+pub trait ScopeCreator<Output,ScopeFnOutput> {
+    
+    type Output <'env,F> 
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>;
+
+    //type Scope<'scope,'env:'scope>:Scope<'scope>+'scope;
+
+    fn scope<'env,F>(&mut self,f:F ) -> Self::Output<'env,F>
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
             //'env:'scope
         ;
 }
 
 pub struct StdScopeCreator;
 
-impl ScopeCreator for StdScopeCreator {
-    type Scope<'scope,'env:'scope> = thread::Scope<'scope,'env>;
+impl<Output,ScopeFnOutput:Send> ScopeCreator<Output,ScopeFnOutput> for StdScopeCreator {
+    //type Scope<'scope,'env:'scope> = thread::Scope<'scope,'env>;
     
-    fn scope<'env,F,T>(&mut self,f:F )->T
-        where F: for<'scope> FnOnce(&'scope Self::Scope<'scope,'env>) -> T,
-            F:'env
-         {
-        thread::scope(f)
+    fn scope<'env,F>(&mut self,f:F )-> Self::Output<'env,F>
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
+    {
+        thread::scope(|scope: &thread::Scope<'_, '_>|f.use_scope(scope))
     }
     
-
+    type Output <'env,F> = <F as ScopeUser<'env>>::Output
+        where F: ScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>;
+    
+    
+    //type Output<'scope,'env:'scope,F:'scope + ScopeUser<'env> + 'env > = <F as ScopeUser<'env>>::Output;
 }
 
-fn test_scope<'env,F,T>(f:F )->T
-    where F: for<'scope> FnOnce(&'scope thread::Scope<'scope,'env>) -> T,
-        //'env:'scope
-        {
-    thread::scope(f)
-}
 
-fn test(){
-    use std::thread;
+#[cfg(test)]
+mod test{
+    use super::*;
+    #[test]
+    fn test(){
+        let mut a = vec![1, 2, 3];
+            let mut x = 0;
 
-    let mut a = vec![1, 2, 3];
-    let mut x = 0;
-
-    thread::scope(|s| {
+            struct AScopeUser<'env>{
+                a:&'env Vec<i32>,
+                x:&'env mut i32
+            };
+            impl<'env> ScopeUser<'env> for AScopeUser<'env> {
+                type Output=();
+                
+                fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->Self::Output
+                    where TScope:'scope+Scope<'scope,()>,
+                        'env:'scope {
+                    let a=self.a;
+                    let x=self.x;
+                    scope.spawn(move || {
+                        println!("hello from the first scoped thread");
+                        // We can borrow `a` here.
+                        dbg!(a);
+                    });
+                    scope.spawn(|| {
+                        println!("hello from the second scoped thread");
+                        // We can even mutably borrow `x` here,
+                        // because no other threads are using it.
+                        *x += a[0] + a[2];
+                    });
+                    println!("hello from the main thread");
+                }
+                
+                type ScopeFnOutput=();
+            
+                
+            }
+            let spam=StdScopeCreator::scope(&mut StdScopeCreator, AScopeUser{a:&a,x:&mut x});
+            a.push(4);
+            assert_eq!(x as usize, a.len());
         
-        s.spawn(|| {
-            println!("hello from the first scoped thread");
-            // We can borrow `a` here.
-            dbg!(&a);
-        });
-        s.spawn(|| {
-            println!("hello from the second scoped thread");
-            // We can even mutably borrow `x` here,
-            // because no other threads are using it.
-            x += a[0] + a[2];
-        });
-        println!("hello from the main thread");
-    });
-
-    // After the scope, we can modify and access our variables again:
-    a.push(4);
-    assert_eq!(x, a.len());
+    }
 }
