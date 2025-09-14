@@ -1,6 +1,6 @@
 use std::{array, ops::{Deref, Index, IndexMut}};
 
-use crate::{structures::n_dim_index::{NDimIndex, NDimIndexIter, NDimIndexer}, traits::scope};
+use crate::{structures::n_dim_index::{NDimIndex, NDimIndexer}, traits::scope};
 
 #[derive(Debug)]
 pub struct NDimArray<TIndexerIter,const DIM:usize,T,Storage>
@@ -69,7 +69,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
         self.get_mut(indexes).map(|a|a as *mut T)
         //self.values.pt
     }
-    pub fn get_with_neiborhoods<'a>(&'a self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<'a,DIM,T>>{
+    pub fn get_with_neiborhoods<'a>(&'a self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,Option<&'a T>>>{
         let res_cur_ptr_may=self.get_ptr(index);
 
         if let Some(res_cur_ptr)=res_cur_ptr_may{
@@ -104,7 +104,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
 
     }
 
-    pub fn get_with_neiborhoods_loop<'a>(&'a self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<'a,DIM,T>>{
+    pub fn get_with_neiborhoods_loop<'a>(&'a self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,Option<&'a T>>>{
         let res_cur_ptr_may=self.get_ptr(index);
 
         if let Some(res_cur_ptr)=res_cur_ptr_may{
@@ -147,7 +147,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
     }
 
 
-    pub fn get_mut_with_neiborhoods<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetMutWithNeiborhoodsResult<'a,DIM,T>>{
+    pub fn get_mut_with_neiborhoods<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a T>>>{
         let res_cur_ptr_may=self.get_mut_ptr(index);
 
         if let Some(res_cur_ptr)=res_cur_ptr_may{
@@ -182,7 +182,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
 
     }
 
-    pub fn get_mut_with_neiborhoods_loop<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetMutWithNeiborhoodsResult<'a,DIM,T>>{
+    pub fn get_mut_with_neiborhoods_loop<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a T>>>{
         let res_cur_ptr_may=self.get_mut_ptr(index);
 
         if let Some(res_cur_ptr)=res_cur_ptr_may{
@@ -225,7 +225,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
     }
 
     
-    pub fn get_mut_with_neiborhoods_mut<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetMutWithNeiborhoodsMutResult<'a,DIM,T>>{
+    pub fn get_mut_with_neiborhoods_mut<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a mut T>>>{
         let res_cur_ptr_may=self.get_mut_ptr(index);
 
         if let Some(res_cur_ptr)=res_cur_ptr_may{
@@ -260,7 +260,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
 
     }
 
-    pub fn get_mut_with_neiborhoods_mut_loop<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetMutWithNeiborhoodsMutResult<'a,DIM,T>>{
+    pub fn get_mut_with_neiborhoods_mut_loop<'a>(&'a mut self,index:NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a mut T>>>{
         let res_cur_ptr_may=self.get_mut_ptr(index);
 
         if let Some(res_cur_ptr)=res_cur_ptr_may{
@@ -321,9 +321,9 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
 }
 
 #[derive(Debug)]
-pub struct NDimArrayGetWithNeiborhoodsResult<'a,const DIM:usize,T>{
-    pub cur:&'a T,
-    pub neiborhoods:[ ((Option<&'a T>,NDimIndex<DIM>),(Option<&'a T>,NDimIndex<DIM>)) ;DIM]
+pub struct NDimArrayGetWithNeiborhoodsResult<const DIM:usize,T,TNeiborhood>{
+    pub cur:T,
+    pub neiborhoods:[ ((TNeiborhood,NDimIndex<DIM>),(TNeiborhood,NDimIndex<DIM>)) ;DIM]
 }
 #[derive(Debug)]
 pub struct NDimArrayGetMutWithNeiborhoodsResult<'a,const DIM:usize,T>{
