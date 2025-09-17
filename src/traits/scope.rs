@@ -61,6 +61,8 @@ impl<Output,ScopeFnOutput:Send> ScopeCreator<Output,ScopeFnOutput> for StdScopeC
 
 #[cfg(test)]
 mod test{
+    use std::ops::Range;
+
     use super::*;
     #[test]
     fn test(){

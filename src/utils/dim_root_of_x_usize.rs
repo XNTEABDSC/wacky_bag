@@ -1,6 +1,5 @@
-use std::{collections::HashMap, sync::{Arc, LazyLock, Mutex}};
+use std::{collections::HashMap, sync::{LazyLock, Mutex}};
 
-use lazy_static::lazy_static;
 
 
 struct DimRootOfXUsize{
@@ -62,10 +61,7 @@ impl Default for DimRootOfXUsize {
 }
 //static mut DIM_ROOT_OF_X_USIZE:LazyLock<Arc<Mutex<DimRootOfXUsize>>>=LazyLock::new(||Default::default());
 
-lazy_static!{
-    static ref DIM_ROOT_OF_X_USIZE:Mutex<DimRootOfXUsize>=Default::default();
-}
-
+static DIM_ROOT_OF_X_USIZE:LazyLock< Mutex<DimRootOfXUsize> > = LazyLock::new(|| Default::default());
 pub fn get_dim_root_of_a_usize(x:usize,dim:usize)->(usize,usize) {
     DIM_ROOT_OF_X_USIZE.lock().unwrap().get(dim, x)
 }

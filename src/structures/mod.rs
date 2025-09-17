@@ -12,5 +12,9 @@ pub mod n_dim_index;
 pub mod n_c_dim_array;
 pub mod just;
 pub mod n_dim_chunk;
+pub mod n_dim_index_2;
+pub mod countable_range_std;
+pub mod typed_deref;
+pub mod countable_range_merge;
 
 //pub mod tuple;

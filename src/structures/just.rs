@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 
-
+#[derive(Debug, Clone, Copy)]
 pub struct Just<T>(pub T);
 
 impl<T> Deref for Just<T> {
@@ -12,10 +12,15 @@ impl<T> Deref for Just<T> {
     }
 }
 
-
 impl<T> DerefMut for Just<T> {
 
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<T> From<T> for Just<T> {
+    fn from(value: T) -> Self {
+        Self(value)
     }
 }
