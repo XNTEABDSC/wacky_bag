@@ -1,6 +1,5 @@
 use std::ops::{Index, IndexMut};
 
-use super::counted_iter::CountedIterator;
 
 ///
 /// values[y][x]

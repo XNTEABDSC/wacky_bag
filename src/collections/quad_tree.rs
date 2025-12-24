@@ -1,6 +1,5 @@
 
 
-use crate::structures::grid::Grid2D;
 
 pub struct QuadTree<TValue>{
     values:Vec<Grid2D<Vec<Vec<TValue>>>>

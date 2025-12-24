@@ -144,52 +144,102 @@ impl<ARange,BRange> CountableRangeForRef for CountableRangeMerge2<ARange,BRange>
 
 
 #[derive(Clone,Copy)]
-pub struct CountableRangeMergeArray<TRange,const LEN:usize>
+pub struct CountableRangeMergeArray<TRange,TRList,const LEN:usize>
 {
     ranges:[TRange;LEN],
-    index_len:usize// we knows nothings about how TRange stores, so we should let users decide how max_len stores, but copy is better.
+    index_lens:TRList,
+    max_len:usize,
+    //index_len:usize// we knows nothings about how TRange stores, so we should let users decide how max_len stores, but copy is better.
 }
 
-impl<TRange, const LEN: usize> CountableRangeMergeArray<TRange, LEN> 
-    where TRange:CountableRangeForRef
+impl<TRange,TRefArray, const LEN: usize> CountableRangeMergeArray<TRange,TRefArray, LEN> 
+    where TRange:CountableRangeForRef,
+    TRefArray:Deref<Target = [usize;LEN]>,
+    [usize;LEN]:Into<TRefArray>,
 {
     pub fn new(ranges:[TRange;LEN])->Self {
-        let index_len=ranges.iter().fold(1, |acc,range|acc*range.index_len());
+        let mut index_lens: [usize; LEN]=[0;LEN];
+        ranges.iter().zip(index_lens.iter_mut()).rev().fold(1, |mut acc,i|{
+            
+            *i.1=acc;
+            acc*=i.0.index_len();
+            
+            acc
+        });
+        let max_len=index_lens[0]*ranges[0].index_len();
+        
+        //let index_len=ranges.iter().fold(1, |acc,range|acc*range.index_len());
         Self{
-            ranges,index_len
+            ranges,index_lens:index_lens.into(),max_len
         }
     }
 }
+
+
+impl<TRange,TRefArray, const LEN: usize> CountableRangeMergeArray<TRange,TRefArray, LEN> 
+    where TRange:CountableRangeForRef,
+    TRefArray:Deref<Target = [usize;LEN]>,
+{
+    pub unsafe fn from_datas(ranges:[TRange;LEN],index_lens:TRefArray,max_len:usize)->Self{
+        Self{ranges,index_lens,max_len}
+    }
+}
 #[derive(Clone,Copy)]
-pub struct CountableRangeMergeArrayItem<TItem,const LEN:usize>{
+pub struct CountableRangeMergeArrayItem<TItem,TRefArray,const LEN:usize>{
     items:[TItem;LEN],
     cached_index:usize,
-    index_len:usize
+    index_lens:TRefArray,
+    max_len:usize
 }
 
-impl<TItem, const LEN: usize> CountableRangeMergeArrayItem<TItem, LEN> 
-    where TItem:CountableRangeItem+CountableRangeItemN
+impl<TItem,TRefArray, const LEN: usize> CountableRangeMergeArrayItem<TItem,TRefArray, LEN> 
+    where TItem:CountableRangeItem+CountableRangeItemN,
+    TRefArray:Deref<Target = [usize;LEN]>
 {
-    
+    pub fn move_n_assign_loop_at_dim(&mut self,dim_idx:usize,n:isize)->isize {
+        assert!(dim_idx<LEN, "dim_idx out of range");
+        let moved=self.items[dim_idx].move_n_assign(n);
+        self.cached_index=
+            (self.cached_index as isize+(n-moved*self.items[dim_idx].range().index_len() as isize)*self.index_lens[dim_idx] as isize) as usize;
+        moved
+    }
+
     pub fn move_n_assign_at_dim(&mut self,dim_idx:usize,n:isize)->isize {
         assert!(dim_idx<LEN, "dim_idx out of range");
-        match self.items.iter_mut().rev().skip(LEN-dim_idx).try_fold(n,|acc,item|{
-            let res=item.move_n_assign(acc);
-            if res==0{
+
+        self.cached_index=(self.cached_index as isize + n * self.index_lens[dim_idx] as isize).rem_euclid(self.max_len as isize) as usize ;
+        
+        let result=match self.items.iter_mut().rev().skip(LEN-dim_idx-1).try_fold(n,|acc,item|{
+            if acc==0{
                 ControlFlow::Break(())
             }else {
-                ControlFlow::Continue(res)
+                ControlFlow::Continue(item.move_n_assign(acc))
             }
         }){
             ControlFlow::Continue(res) => res,
             ControlFlow::Break(_) => 0,
-        }
+        };
+
+        self.check_index();
+        result
     }
+
+    
 }
 
-impl<TItem, const LEN: usize> CountableRangeMergeArrayItem<TItem, LEN> 
-    where TItem: CountableRangeItem
-{
+impl<TItem, TRefArray, const LEN: usize> CountableRangeMergeArrayItem<TItem, TRefArray, LEN> 
+    where TItem: CountableRangeItem,
+    TRefArray:Deref<Target = [usize;LEN]>
+    {
+        fn calc_index(&self)->usize{
+        self.items.iter().fold(0, |acc,item|{
+            acc*item.range().index_len()+item.index()
+        })
+    }
+    fn check_index(&self){
+        debug_assert_eq!(self.cached_index,self.calc_index());
+    }
+
     pub fn next_assign_at_dim(&mut self,dim_idx:usize)->bool{
         assert!(dim_idx<LEN, "dim_idx out of range");
         match self.items.iter_mut().rev().skip(LEN-dim_idx).try_for_each(|item|{
@@ -238,23 +288,26 @@ impl<TItem, const LEN: usize> CountableRangeMergeArrayItem<TItem, LEN>
     }
 }
 
-impl<TItem, const LEN: usize> CountableRangeMergeArrayItem<TItem, LEN> {
-    pub fn into_inner(self)->([TItem;LEN],usize,usize) {
-        (self.items,self.cached_index,self.index_len)
+impl<TItem, TRefArray, const LEN: usize> CountableRangeMergeArrayItem<TItem, TRefArray, LEN> 
+
+{
+    pub fn into_inner(self)->([TItem;LEN],usize,TRefArray,usize) {
+        (self.items,self.cached_index,self.index_lens,self.max_len)
     }
 }
 
 
 
-impl<TItem, const LEN: usize> CountableRangeItemN for CountableRangeMergeArrayItem<TItem, LEN> 
-    where TItem: CountableRangeItem+CountableRangeItemN 
+impl<TItem, TRefArray, const LEN: usize> CountableRangeItemN for CountableRangeMergeArrayItem<TItem, TRefArray, LEN> 
+    where TItem: CountableRangeItem+CountableRangeItemN,
+        TRefArray:Deref<Target = [usize;LEN]>
 {
     fn move_n_assign(&mut self,n:isize)->isize {
-        self.cached_index+=n.rem_euclid(self.index_len as isize) as usize;
+        self.cached_index+=n.rem_euclid(self.max_len as isize) as usize;
         // #[cfg(debug_assertions)]
         // let mut div=n.div_euclid(self.index_len as isize);
-        if self.cached_index>self.index_len{
-            self.cached_index-=self.index_len;
+        if self.cached_index>self.max_len{
+            self.cached_index-=self.max_len;
             // #[cfg(debug_assertions)]
             // div=div+1;
         }
@@ -265,7 +318,7 @@ impl<TItem, const LEN: usize> CountableRangeItemN for CountableRangeMergeArrayIt
     }
 }
 
-impl<TItem,const LEN:usize> Deref for CountableRangeMergeArrayItem<TItem,LEN> {
+impl<TItem, TRefArray,const LEN:usize> Deref for CountableRangeMergeArrayItem<TItem, TRefArray,LEN> {
     type Target=[TItem;LEN];
 
     fn deref(&self) -> &Self::Target {
@@ -273,11 +326,12 @@ impl<TItem,const LEN:usize> Deref for CountableRangeMergeArrayItem<TItem,LEN> {
     }
 }
 
-impl<TItem,const LEN:usize> CountableRangeItem for CountableRangeMergeArrayItem<TItem,LEN> 
+impl<TItem, TRefArray,const LEN:usize> CountableRangeItem for CountableRangeMergeArrayItem<TItem, TRefArray,LEN> 
     where 
         TItem:CountableRangeItem,
+        TRefArray:Deref<Target = [usize;LEN]>
 {
-    type RangeRef<'a> = CountableRangeMergeArray< TItem::RangeRef<'a>,LEN >
+    type RangeRef<'a> = CountableRangeMergeArray< TItem::RangeRef<'a>,&'a [usize;LEN],LEN >
         where 
         Self:'a,;
 
@@ -331,45 +385,44 @@ impl<TItem,const LEN:usize> CountableRangeItem for CountableRangeMergeArrayItem<
 
     fn last_assign(&mut self) {
         self.items.iter_mut().for_each(|i|i.last_assign());
-        self.cached_index=self.index_len-1;
+        self.cached_index=self.max_len-1;
     }
 
     fn index(&self)->usize {
-        debug_assert_eq!(
-            self.cached_index,
-            self.items.iter().fold(0, |acc,item|{
-                acc*item.range().index_len()+item.index()
-            })
-        );
+        self.check_index();
         self.cached_index
     }
 
     fn range<'a>(&'a self)->Self::RangeRef<'a> {
         CountableRangeMergeArray{
             ranges:array::from_fn(|i|self.items[i].range()),
-            index_len:self.index_len
+            max_len:self.max_len,
+            index_lens:&self.index_lens
         }
     }
 }
 
-impl<TRange,const LEN:usize> CountableRangeForRef for CountableRangeMergeArray<TRange,LEN>
-    where TRange:CountableRangeForRef
+impl<TRange,TRefArray,const LEN:usize> CountableRangeForRef for CountableRangeMergeArray<TRange,TRefArray,LEN>
+    where TRange:CountableRangeForRef,
+    TRefArray:Deref<Target = [usize;LEN]>
 {
-    type Item=CountableRangeMergeArrayItem<TRange::Item,LEN>;
+    type Item=CountableRangeMergeArrayItem<TRange::Item,TRefArray,LEN>;
 
     fn item_first(self)->Self::Item {
         CountableRangeMergeArrayItem{
             items:self.ranges.map(|i|i.item_first()),
-            index_len:self.index_len,
             cached_index:0,
+            index_lens:self.index_lens,
+            max_len:self.max_len,
         }
     }
 
     fn item_last(self)->Self::Item {
         CountableRangeMergeArrayItem{
             items:self.ranges.map(|i|i.item_last()),
-            index_len:self.index_len,
-            cached_index:self.index_len-1,
+            cached_index:self.max_len-1,
+            index_lens:self.index_lens,
+            max_len:self.max_len,
         }
     }
 
@@ -387,22 +440,23 @@ impl<TRange,const LEN:usize> CountableRangeForRef for CountableRangeMergeArray<T
         Some(CountableRangeMergeArrayItem{
             items: range_idxes.map(|a|a.0.item_from_index(a.1).unwrap()),//array::from_fn(|i|self.ranges[i].item_from_index(sub_idxes[i]).unwrap()),
             cached_index: index,
-            index_len: self.index_len,
+            index_lens:self.index_lens,
+            max_len:self.max_len,
         })
     }
 
     fn index_len(&self)->usize {
         debug_assert_eq!(
-            self.index_len,
+            self.max_len,
             self.ranges.iter().fold(1, |acc,range|acc*range.index_len())
         );
-        self.index_len
+        self.max_len
     }
 }
 
 #[cfg(test)]
 mod test{
-    use std::rc::Rc;
+    use std::{process::id, rc::Rc};
 
     use crate::{structures::{countable_range_merge::CountableRangeMerge2, countable_range_std::CountableRangeStd, typed_deref::ToNTDeref}, traits::countable_range::{CountableRangeForRef, CountableRangeItem}};
 
@@ -410,8 +464,9 @@ mod test{
     #[test]
     fn test_merge2(){
         let idx1=CountableRangeMerge2{
-            a:Rc::new(CountableRangeStd::from_range(-3..3)).as_nt_deref(),
-            b:Rc::new(CountableRangeStd::from_range(-2..2)).as_nt_deref()};
+            a: CountableRangeStd::new(Rc::new(-3..=2)),//Rc::new(CountableRangeStd::from_range(-3..3)).as_nt_deref(),
+            b: CountableRangeStd::new(Rc::new(-3..=2)),//Rc::new(CountableRangeStd::from_range(-2..2)).as_nt_deref()};
+        };
         let mut idx1_item1=idx1.clone().item_first();
         println!("test next");
         loop {
@@ -433,11 +488,13 @@ mod test{
     }
     #[test]
     fn test_merge_array(){
-        let idx1=CountableRangeMergeArray::new([
-            Rc::new(CountableRangeStd::from_range(0..4)).as_nt_deref(),
-            Rc::new(CountableRangeStd::from_range(0..4)).as_nt_deref(),
-            Rc::new(CountableRangeStd::from_range(0..4)).as_nt_deref(),
+        let a_range=0..=3;
+        let idx1=CountableRangeMergeArray::<_,Just<_>,_>::new([
+            CountableRangeStd::new(&a_range),
+            CountableRangeStd::new(&a_range),
+            CountableRangeStd::new(&a_range),
         ]);
+        println!("{:?}",idx1.index_lens);
         assert_eq!(idx1.index_len(),4*4*4);
         let mut idx1_item=idx1.clone().item_first();
         loop {
@@ -455,11 +512,13 @@ mod test{
                 break;
             }
         }
-        let a=1;
-        let a_box:Box<_>=a.into();
-        let b=1;
-        let b_rc:Rc<_>=b.into();
-        let c=1;
-        let c_ref:Just<_>=c.into();
+        let mut idx3_item=idx1.clone().item_first();
+        loop {
+            let things=idx3_item.deref();
+            println!("{:?}:{}",things.iter().map(|a|a.deref()).collect::<Vec<_>>(),idx3_item.index());
+            if idx3_item.move_n_assign_at_dim(1,3)>0 {
+                break;
+            }
+        }
     }
 }

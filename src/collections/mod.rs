@@ -1,7 +1,7 @@
 pub mod raw_vec;
 pub mod typed_list;
 pub mod int_list;
-pub mod quad_tree;
+// pub mod quad_tree;
 pub mod trie;
 //pub mod shifted_array;
 //pub mod chain_set;
