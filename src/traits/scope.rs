@@ -34,7 +34,7 @@ pub trait ThreadScopeCreator<Output,ScopeFnOutput> {
 
     //type Scope<'scope,'env:'scope>:Scope<'scope>+'scope;
 
-    fn scope<'env,F>(&self,f:F ) -> Self::Output<'env,F>
+    fn scope<'env,F>(&mut self,f:F ) -> Self::Output<'env,F>
         where F: ThreadScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
             //'env:'scope
         ;
@@ -45,7 +45,7 @@ pub struct ThreadScopeCreatorStd;
 impl<Output,ScopeFnOutput:Send> ThreadScopeCreator<Output,ScopeFnOutput> for ThreadScopeCreatorStd {
     //type Scope<'scope,'env:'scope> = thread::Scope<'scope,'env>;
     
-    fn scope<'env,F>(&self,f:F )-> Self::Output<'env,F>
+    fn scope<'env,F>(&mut self,f:F )-> Self::Output<'env,F>
         where F: ThreadScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
     {
         thread::scope(|scope: &thread::Scope<'_, '_>|f.use_scope(scope))
@@ -71,7 +71,7 @@ mod test{
             struct AScopeUser<'env>{
                 a:&'env Vec<i32>,
                 x:&'env mut i32
-            };
+            }
             impl<'env> ThreadScopeUser<'env> for AScopeUser<'env> {
                 type Output=();
                 
@@ -97,6 +97,9 @@ mod test{
                 type ScopeFnOutput=();
             
                 
+            }
+            for _ in 1..3 {
+                let _spam=ThreadScopeCreatorStd::scope(&mut ThreadScopeCreatorStd, AScopeUser{a:&a,x:&mut x});
             }
             let _spam=ThreadScopeCreatorStd::scope(&mut ThreadScopeCreatorStd, AScopeUser{a:&a,x:&mut x});
             let _spam=ThreadScopeCreatorStd::scope(&mut ThreadScopeCreatorStd, AScopeUser{a:&a,x:&mut x});

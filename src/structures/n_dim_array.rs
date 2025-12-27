@@ -195,7 +195,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
 
     
     pub fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:Func,mut scope_creator:TScopeCreator)
-        where Func: Fn(&'ext_env mut T,&'ext_env mut T,usize)+'ext_env+Sync+Send,
+        where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'ext_env+Sync+Send,
         TScopeCreator: ThreadScopeCreator<(),()>,
 		T:Send+Sync,
     {
@@ -213,7 +213,7 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
             impl<'env,Func,TIndexerIter,const DIM:usize,T,Storage> ThreadScopeUser<'env> for AScopeUser<'env,Func,TIndexerIter,DIM,T,Storage> 
                 where TIndexerIter:Deref<Target = NDimIndexer<DIM>>,
                 Storage:Index<usize,Output=T>+IndexMut<usize>,
-				Func: Fn(&'env mut T,&'env mut T,usize)+'env+Sync+Send,
+				Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'env+Sync+Send,
 				T:Send+Sync,
 				
             {
@@ -248,15 +248,12 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
                 
                 type ScopeFnOutput=();
             }
-
-			ThreadScopeCreator::scope(&mut ThreadScopeCreatorStd, 
-				AScopeUser{values:self,mut_dim,func:&func,plus_1:false});
-            // scope_creator.scope(
-            //     AScopeUser{values:self,mut_dim,func:&func,plus_1:false}
-            // );
-            // scope_creator.scope(
-            //     AScopeUser{values:self,mut_dim,func:&func,plus_1:true}
-            // );
+            scope_creator.scope(
+                AScopeUser{values:self,mut_dim,func:&func,plus_1:false}
+            );
+            scope_creator.scope(
+                AScopeUser{values:self,mut_dim,func:&func,plus_1:true}
+            );
         }
     }
     // pub fn parallel_iter_pair_mut<'a,Func,ScopeCreator,Scope>(&'a mut self,func:Func,mut scope_creator:ScopeCreator)
