@@ -1,5 +1,6 @@
+use std::sync::LazyLock;
 use std::{collections::BinaryHeap, sync::Mutex, usize};
-use lazy_static::lazy_static;
+//use lazy_static::lazy_static;
 use std::num::Wrapping;
 /// Enum grid position, by the other of the distance of grid's closest point to (0,0)
 /// 0<=y<=x
@@ -48,16 +49,27 @@ struct GridIterData{
     pub grid_iter_checked_cache:Vec<PointAndDistance>,
     pub grid_iter_unchecked_len:BinaryHeap<PointAndDistance>,
 }
-lazy_static!{
-    static ref GRID_ITER_UNCHECKED_LEN_MUTEX: Mutex<GridIterData> =
+
+static GRID_ITER_UNCHECKED_LEN_MUTEX: LazyLock<Mutex<GridIterData>> =LazyLock::new(||{
     Mutex::new( 
         GridIterData{
             grid_iter_unchecked_len:BinaryHeap::<PointAndDistance>::new(),
             grid_iter_checked_len:-1,
             grid_iter_checked_cache:Vec::<PointAndDistance>::new()
         }
-    );
-}
+    )
+});
+
+// lazy_static!{
+//     static ref GRID_ITER_UNCHECKED_LEN_MUTEX: Mutex<GridIterData> =
+//     Mutex::new( 
+//         GridIterData{
+//             grid_iter_unchecked_len:BinaryHeap::<PointAndDistance>::new(),
+//             grid_iter_checked_len:-1,
+//             grid_iter_checked_cache:Vec::<PointAndDistance>::new()
+//         }
+//     );
+// }
 
 fn grow(needed:usize){
     {

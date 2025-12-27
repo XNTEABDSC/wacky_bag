@@ -8,5 +8,5 @@ edition = "2024"
 [dependencies]
 # wacky_traits={path="../wacky_traits"}
 # my_tuple={path="../my_tuple"}
-lazy_static = "1.5.0"
+# lazy_static = "1.5.0"
 wacky_bag_macro = { path = "./wacky_bag_macro" }

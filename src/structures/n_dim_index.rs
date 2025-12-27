@@ -66,7 +66,7 @@ impl<const DIM:usize> NDimIndexer<DIM>{
 
 
         let mut last_range:Range<isize>=0..1;
-
+        
         let mut starts=[0;DIM];
         let mut steps=[0;DIM];
 
@@ -97,7 +97,7 @@ impl<const DIM:usize> NDimIndexer<DIM>{
         Self{starts,steps,range:last_range.clone(),lens,range_u:(last_range.end-last_range.start) as usize}
     }
     
-    pub fn contains(&self,indexes:NDimIndex<DIM>)->bool{
+    pub fn contains(&self,indexes:&NDimIndex<DIM>)->bool{
         //let mut pass=true;
         for i in 0..DIM {
             if self.lens[i].contains(&indexes[i]){
@@ -110,10 +110,10 @@ impl<const DIM:usize> NDimIndexer<DIM>{
     }
 
     pub fn contains_compressed_u(&self,index:usize)->bool{
-        0<=index&&index<self.range_u
+        index<self.range_u
     }
     
-    pub fn compress_index_u(&self,indexes:NDimIndex<DIM>)->usize{
+    pub fn compress_index_u(&self,indexes:&NDimIndex<DIM>)->usize{
         let mut res:usize=0;
         for i in 0..DIM {
             res+=((indexes[i]-self.lens[i].start)*self.steps[i]) as usize;
@@ -121,19 +121,27 @@ impl<const DIM:usize> NDimIndexer<DIM>{
         res
     }
     pub fn decompress_index_u(&self,mut compressed_index:usize)->NDimIndex<DIM> {
-        let mut res=[0;DIM];
-        let mut i=DIM-1;
-        loop{
+        array::from_fn(|i|{
             let step=self.steps[i] as usize;
             let (div,rem)=(compressed_index/step,compressed_index%step);
-            res[i]=div as isize+self.lens[i].start;
-            compressed_index=rem;
-            if i==0{
-                break;
-            }
-            i-=1;
-        }
-        res
+            compressed_index=div;
+            rem as isize + self.lens[i].start
+        })
+
+
+        // let mut res=[0;DIM];
+        // let mut i=DIM-1;
+        // loop{
+        //     let step=self.steps[i] as usize;
+        //     let (div,rem)=(compressed_index/step,compressed_index%step);
+        //     res[i]=div as isize+self.lens[i].start;
+        //     compressed_index=rem;
+        //     if i==0{
+        //         break;
+        //     }
+        //     i-=1;
+        // }
+        // res
     }
     pub fn iter<'a>(&'a self)->NDimIndexIter<'a,DIM> {
         NDimIndexIter::new(&self.lens)
@@ -169,7 +177,7 @@ impl<const DIM:usize> NDimIndexer<DIM>{
 fn test() {
     let a_ndidxer=NDimIndexer::new_len([-5..5,-5..5,-5..5]);
     let a_ndidx=[-2,0,2];
-    let a_cidx=a_ndidxer.compress_index_u(a_ndidx);
+    let a_cidx=a_ndidxer.compress_index_u(&a_ndidx);
     println!("{:?}",a_ndidxer.starts());
     println!("{:?}",a_ndidxer.steps());
     println!("{:?}",a_cidx);

@@ -68,19 +68,29 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
         }
         res
     }
+    /* */
     pub fn seperate_index(&self,mut compressed_index:usize)->NDimIndexU<DIM>{
-        let mut res=[0;DIM];
-        let mut i=DIM-1;
-        loop{
-            let (div,rem)=(compressed_index/self.steps[i],compressed_index%self.steps[i]);
-            res[i]=div;
-            compressed_index=rem;
-            if i==0{
-                break;
-            }
-            i-=1;
-        }
+
+        let res:[usize;DIM]=array::from_fn(|i|{
+            let step=self.lens[i];
+            let (div,rem)=(compressed_index/step,compressed_index%step);
+            compressed_index=div;
+            rem
+        });
         res
+
+        // let mut res=[0;DIM];
+        // let mut i=DIM-1;
+        // loop{
+        //     let (div,rem)=(compressed_index/self.steps[i],compressed_index%self.steps[i]);
+        //     res[i]=div;
+        //     compressed_index=rem;
+        //     if i==0{
+        //         break;
+        //     }
+        //     i-=1;
+        // }
+        // res
     }
     pub fn iter<'a>(&'a self)->NDimIndexUIter<'a,DIM> {
         NDimIndexUIter::new(&self.lens)
