@@ -256,13 +256,6 @@ impl<TIndexerIter,const DIM:usize,T,Storage> NDimArray<TIndexerIter,DIM,T,Storag
             );
         }
     }
-    // pub fn parallel_iter_pair_mut<'a,Func,ScopeCreator,Scope>(&'a mut self,func:Func,mut scope_creator:ScopeCreator)
-    //     where Func:Fn(&'a mut T,&'a mut T,usize,bool),
-    //     ScopeCreator:FnMut( Fn(Scope)  ),
-    //     Scope:scope::Scope<'a>
-    // {
-    //     std::thread::spawn(f)
-    // }
 
     
 }
