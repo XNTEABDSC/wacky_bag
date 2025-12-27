@@ -16,7 +16,8 @@ impl<T,const DIM:usize> NDimChunk<T,DIM> {
         let size_of_t=size_of::<T>();
         let chunk_count=chunk_size/size_of_t;
         let (dim_count,chunk_count)=get_dim_root_of_a_usize(chunk_count,DIM);
-        let mut values=Vec::from_iter(iter);
-        Self { values }
+        todo!()
+        // let mut values=Vec::from_iter(iter);
+        // Self { values }
     }
 }

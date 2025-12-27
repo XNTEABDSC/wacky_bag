@@ -173,6 +173,19 @@ impl<Key,Value> Trie<Key,Value>
     } */
 }
 
+impl<Key,Value,const N:usize> From<[( [Key;N],Value);N]> for Trie<Key,Value> 
+    where Key:Hash+Eq
+{
+    fn from(arr: [( [Key;N],Value);N]) -> Self {
+        let mut v=Self::new();
+        for i in arr {
+            v.insert(i.0.into_iter(), i.1);
+        }
+        v
+    }
+    
+}
+
 impl<Key,Value,KeyIter> FromIterator<(KeyIter,Value)> for Trie<Key,Value> 
     where Key:Hash+Eq,
     KeyIter:Iterator<Item = Key>
