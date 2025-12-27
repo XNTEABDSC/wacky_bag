@@ -56,11 +56,11 @@ impl<T,const DIM:usize> DoublyGridLayers<DIM,T> {
 
     pub fn get_doubly_grid_index(&self,index:DoublyGridIndex<DIM>)->Option<&T> {
         self.values.get(index.layer as usize).map_or(None, 
-            |values| values.get(index.pos))
+            |values| values.get(&index.pos))
     }
     pub fn get_mut_doubly_grid_index(&mut self,index:DoublyGridIndex<DIM>)->Option<&mut T> {
         self.values.get_mut(index.layer as usize).map_or(None, 
-            |values| values.get_mut(index.pos))
+            |values| values.get_mut(&index.pos))
     }
 }
 

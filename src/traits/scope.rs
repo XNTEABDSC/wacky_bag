@@ -34,7 +34,7 @@ pub trait ThreadScopeCreator<Output,ScopeFnOutput> {
 
     //type Scope<'scope,'env:'scope>:Scope<'scope>+'scope;
 
-    fn scope<'env,F>(&mut self,f:F ) -> Self::Output<'env,F>
+    fn scope<'env,F>(&self,f:F ) -> Self::Output<'env,F>
         where F: ThreadScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
             //'env:'scope
         ;
@@ -45,7 +45,7 @@ pub struct ThreadScopeCreatorStd;
 impl<Output,ScopeFnOutput:Send> ThreadScopeCreator<Output,ScopeFnOutput> for ThreadScopeCreatorStd {
     //type Scope<'scope,'env:'scope> = thread::Scope<'scope,'env>;
     
-    fn scope<'env,F>(&mut self,f:F )-> Self::Output<'env,F>
+    fn scope<'env,F>(&self,f:F )-> Self::Output<'env,F>
         where F: ThreadScopeUser<'env,Output = Output,ScopeFnOutput = ScopeFnOutput>,
     {
         thread::scope(|scope: &thread::Scope<'_, '_>|f.use_scope(scope))
@@ -61,7 +61,6 @@ impl<Output,ScopeFnOutput:Send> ThreadScopeCreator<Output,ScopeFnOutput> for Thr
 
 #[cfg(test)]
 mod test{
-    use std::ops::Range;
 
     use super::*;
     #[test]
@@ -99,7 +98,8 @@ mod test{
             
                 
             }
-            let spam=ThreadScopeCreatorStd::scope(&mut ThreadScopeCreatorStd, AScopeUser{a:&a,x:&mut x});
+            let _spam=ThreadScopeCreatorStd::scope(&mut ThreadScopeCreatorStd, AScopeUser{a:&a,x:&mut x});
+            let _spam=ThreadScopeCreatorStd::scope(&mut ThreadScopeCreatorStd, AScopeUser{a:&a,x:&mut x});
             a.push(4);
             assert_eq!(x as usize, a.len());
         
