@@ -9,11 +9,11 @@ pub mod doubly_slice_layers;
 pub mod n_dim_index_u;
 pub mod n_dim_array;
 pub mod n_dim_index;
-pub mod n_c_dim_array;
 pub mod just;
 pub mod n_dim_chunk;
 pub mod n_dim_index_2;
 pub mod typed_deref;
+pub mod n_dim_chunk_array;
 // pub mod countable_range_std;
 // pub mod countable_range_merge;
 
