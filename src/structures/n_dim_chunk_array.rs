@@ -1,6 +1,6 @@
 use std::{array, mem::MaybeUninit, ops::{Deref, Div, Range, Rem}};
 
-use crate::{structures::{just::Just, n_dim_array::{NDimArray, TNDimArray}, n_dim_chunk::NDimChunk, n_dim_index::{NDimIndex, NDimIndexer, TNDimIndexer}, n_dim_index_u::NDimIndexerU}};
+use crate::structures::{just::Just, n_dim_array::{NDimArray, TNDimArray, TNDimArrayParallelIterPair}, n_dim_chunk::NDimChunk, n_dim_index::{NDimIndex, NDimIndexer, TNDimIndexer}, n_dim_index_u::NDimIndexerU};
 
 use crate::traits::scope_no_ret::{ThreadScopeCreator, ThreadScopeUser};
 pub struct NDimChunkArray<const DIM:usize,T> 
@@ -77,39 +77,7 @@ impl<const DIM:usize,T> TNDimArray<DIM, T> for NDimChunkArray<DIM,T>
 		self.values.get_mut(&chunks_idx).and_then(|a|a.get_mut(&inner_idx))
     }
 
-    fn get_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a self,index:&super::n_dim_index::NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<super::n_dim_array::NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
-            where ForNeiborhood:Fn(&'a Self,&mut super::n_dim_index::NDimIndex<DIM>,usize,bool)->NeiborhoodResult {
-        todo!()
-    }
-
-    fn get_mut_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a mut self,index:&super::n_dim_index::NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<super::n_dim_array::NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,NeiborhoodResult>>
-            where ForNeiborhood:FnMut(&mut Self,&mut super::n_dim_index::NDimIndex<DIM>,usize,bool)->NeiborhoodResult {
-        todo!()
-    } 
-
-    fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
-        where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'ext_env+Sync+Send,
-        TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
-            T:Send+Sync 
-	{
-		self.values.parallel_iter_mut(&|a,idx|{
-			a.parallel_iter_pair_mut(func, scope_creator);
-		}, scope_creator);
-		
-        // struct A<'env,const DIM:usize,T,Func>{
-		// 	array:&'env mut NDimChunkArray<DIM,T>,
-		// 	func:&'env Func,
-		// }
-		// impl<'env,const DIM:usize,T,Func> ThreadScopeUser<'env> for A<'env,DIM,T,Func>{
-		// 	fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
-		// 		where TScope:'scope+crate::traits::scope_no_ret::ThreadScope<'scope>,
-		// 			'env:'scope 
-		// 	{
-				
-		// 	}
-		// }
-    }
-	
+    
 	fn parallel_iter<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
 			where Func: for<'scope> Fn(&'scope T,&'scope NDimIndex<DIM>)+'ext_env+Sync+Send,
 			TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
@@ -124,14 +92,27 @@ impl<const DIM:usize,T> TNDimArray<DIM, T> for NDimChunkArray<DIM,T>
 		todo!()
 	}
 	
+	
+}
+
+impl<const DIM:usize,T> TNDimArrayParallelIterPair<DIM, T> for NDimChunkArray<DIM,T>{
 	fn parallel_iter_pair<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
 		where Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'ext_env+Sync+Send,
 		TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
 			T:Send+Sync {
 		todo!()
 	}
+	fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
+        where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'ext_env+Sync+Send,
+        TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
+            T:Send+Sync 
+	{
+		self.values.parallel_iter_mut(&|a,idx|{
+			a.parallel_iter_pair_mut(func, scope_creator);
+		}, scope_creator);
+    }
+	
 }
-
 
 pub struct NDimChunkArrayIter<'a,const DIM:usize,T>
 {

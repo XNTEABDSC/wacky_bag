@@ -56,7 +56,7 @@ impl DimRootOfXUsize {
 
 impl Default for DimRootOfXUsize {
     fn default() -> Self {
-        Self { values: Default::default() }
+		Self::new()
     }
 }
 //static mut DIM_ROOT_OF_X_USIZE:LazyLock<Arc<Mutex<DimRootOfXUsize>>>=LazyLock::new(||Default::default());

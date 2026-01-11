@@ -31,6 +31,18 @@ pub trait TNDimArray<const DIM:usize,T>
     fn get(&self,indexes:&NDimIndex<DIM>)->Option<&T>;
     fn get_mut(&mut self,indexes:&NDimIndex<DIM>)->Option<&mut T>;
 
+	fn parallel_iter<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
+		where Func: for<'scope> Fn(&'scope T,&'scope NDimIndex<DIM>)+'ext_env+Sync+Send,
+		TScopeCreator: ThreadScopeCreator+Sync,
+		T:Send+Sync;
+		
+	fn parallel_iter_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
+		where Func: for<'scope> Fn(&'scope mut T,&'scope NDimIndex<DIM>)+'ext_env+Sync+Send,
+		TScopeCreator: ThreadScopeCreator+Sync,
+		T:Send+Sync;
+}
+
+pub trait TNDimArrayGetWithNeiborhoods<const DIM:usize,T> : TNDimArray<DIM,T>  {
 	fn get_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
 		where ForNeiborhood:Fn(&'a Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult;
 
@@ -84,17 +96,9 @@ pub trait TNDimArray<const DIM:usize,T>
 			unsafe{transmute(s.get(i))}
 		})
 	}
+}
 
-	fn parallel_iter<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
-		where Func: for<'scope> Fn(&'scope T,&'scope NDimIndex<DIM>)+'ext_env+Sync+Send,
-		TScopeCreator: ThreadScopeCreator+Sync,
-		T:Send+Sync;
-		
-	fn parallel_iter_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
-		where Func: for<'scope> Fn(&'scope mut T,&'scope NDimIndex<DIM>)+'ext_env+Sync+Send,
-		TScopeCreator: ThreadScopeCreator+Sync,
-		T:Send+Sync;
-	
+pub trait TNDimArrayParallelIterPair<const DIM:usize,T> : TNDimArray<DIM,T> {
     fn parallel_iter_pair<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
         where Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'ext_env+Sync+Send,
         TScopeCreator: ThreadScopeCreator+Sync,
@@ -155,109 +159,6 @@ impl<TIndexer,const DIM:usize,T,Storage> TNDimArray<DIM, T> for NDimArray<TIndex
 	fn get_mut(&mut self,indexes:&NDimIndex<DIM>)->Option<&mut T>{
 		if !self.n_dim_index.contains(indexes){return None;}
 		Some(self.values.index_mut(self.n_dim_index.compress_index(indexes)))
-	}
-
-	fn get_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
-		where ForNeiborhood:Fn(&'a Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult
-	{
-		self.get(index).map(|res_cur|{
-			let res_neiborhoods = array::from_fn(|dim|{
-				let mut nindex_0=index.clone();
-				nindex_0[dim]+=1;
-				let res_0=for_neiborhood(self,&mut nindex_0,dim,true);
-				let mut nindex_1=index.clone();
-				nindex_1[dim]-=1;
-				let res_1=for_neiborhood(self,&mut nindex_1,dim,false);
-				return ((res_0,nindex_0),(res_1,nindex_1));
-
-			});
-			NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods }
-		})
-	}
-
-	fn get_mut_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a mut self,index:&NDimIndex<DIM>,mut for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,NeiborhoodResult>>
-		where ForNeiborhood:FnMut(&mut Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult
-	{
-		let res_cur_may=unsafe {
-			self.get_mut_other(index)
-		};
-
-		if let Some(res_cur)=res_cur_may{
-
-			let res_neiborhoods = array::from_fn(|dim|{
-				let mut nindex_0=index.clone();
-				nindex_0[dim]+=1;
-				let res_0=for_neiborhood(self,&mut nindex_0,dim,true);
-				let mut nindex_1=index.clone();
-				nindex_1[dim]-=1;
-				let res_1=for_neiborhood(self,&mut nindex_1,dim,false);
-				return ((res_0,nindex_0),(res_1,nindex_1));
-
-			});
-			return Some(NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
-		}else {
-			return None;
-		}
-	}
-
-	
-
-	
-	fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
-		where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'ext_env+Sync+Send,
-		TScopeCreator: ThreadScopeCreator+Sync,
-		T:Send+Sync,
-	{
-		for mut_dim in 0..DIM {
-			struct AScopeUser<'env,Func,TIndexer,const DIM:usize,T,Storage>
-				where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
-				Storage:Index<usize,Output=T>+IndexMut<usize>
-			{
-				values:&'env mut NDimArray<TIndexer,DIM,T,Storage>,
-				mut_dim:usize,
-				func:&'env Func,
-				plus_1:bool,
-			}
-			impl<'env,Func,TIndexer,const DIM:usize,T,Storage> ThreadScopeUser<'env> for AScopeUser<'env,Func,TIndexer,DIM,T,Storage> 
-				where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
-				Storage:Index<usize,Output=T>+IndexMut<usize>,
-				Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'env+Sync+Send,
-				T:Send+Sync,
-				
-			{
-				fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
-					where TScope:'scope+scope_no_ret::ThreadScope<'scope>,
-						'env:'scope {
-					let rem=if self.plus_1 {0} else {1};
-					let values=self.values;
-					let n_dim_index:&TIndexer=unsafe {
-						transmute(&values.n_dim_index)
-					};
-					let mut_dim=self.mut_dim;
-					let func=self.func;
-					for p in n_dim_index.iter() {
-						if p[mut_dim]%2==rem {
-							continue;
-						}
-						let mut p2=p.clone();
-						p2[mut_dim]+=1;
-						if let Some(v1)=unsafe{values.get_mut_other(&p)}{
-							if let Some(v2)=unsafe{values.get_mut_other(&p2)}{
-								scope.spawn( move||{
-									(func)(v1,v2,mut_dim);
-								});
-							}
-						}
-					}
-				}
-			}
-			scope_creator.scope(
-				AScopeUser{values:self,mut_dim,func:&func,plus_1:false}
-			);
-			scope_creator.scope(
-				AScopeUser{values:self,mut_dim,func:&func,plus_1:true}
-			);
-		}
 	}
 	
 	fn parallel_iter<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
@@ -340,14 +241,121 @@ impl<TIndexer,const DIM:usize,T,Storage> TNDimArray<DIM, T> for NDimArray<TIndex
 		);
 	}
 	
-	fn parallel_iter_pair<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
-			where Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'ext_env+Sync+Send,
-			TScopeCreator: ThreadScopeCreator+Sync,
-				T:Send+Sync {
-			todo!()
-		}
+}
 
-	
+impl<TIndexer,const DIM:usize,T,Storage> TNDimArrayGetWithNeiborhoods<DIM, T> for NDimArray<TIndexer,DIM,T,Storage>  
+	where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
+	Storage:Index<usize,Output=T>+IndexMut<usize>{
+	fn get_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
+		where ForNeiborhood:Fn(&'a Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult
+	{
+		self.get(index).map(|res_cur|{
+			let res_neiborhoods = array::from_fn(|dim|{
+				let mut nindex_0=index.clone();
+				nindex_0[dim]+=1;
+				let res_0=for_neiborhood(self,&mut nindex_0,dim,true);
+				let mut nindex_1=index.clone();
+				nindex_1[dim]-=1;
+				let res_1=for_neiborhood(self,&mut nindex_1,dim,false);
+				return ((res_0,nindex_0),(res_1,nindex_1));
+
+			});
+			NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods }
+		})
+	}
+
+	fn get_mut_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a mut self,index:&NDimIndex<DIM>,mut for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,NeiborhoodResult>>
+		where ForNeiborhood:FnMut(&mut Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult
+	{
+		let res_cur_may=unsafe {
+			self.get_mut_other(index)
+		};
+
+		if let Some(res_cur)=res_cur_may{
+
+			let res_neiborhoods = array::from_fn(|dim|{
+				let mut nindex_0=index.clone();
+				nindex_0[dim]+=1;
+				let res_0=for_neiborhood(self,&mut nindex_0,dim,true);
+				let mut nindex_1=index.clone();
+				nindex_1[dim]-=1;
+				let res_1=for_neiborhood(self,&mut nindex_1,dim,false);
+				return ((res_0,nindex_0),(res_1,nindex_1));
+
+			});
+			return Some(NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
+		}else {
+			return None;
+		}
+	}
+
+}
+
+impl<TIndexer,const DIM:usize,T,Storage> TNDimArrayParallelIterPair<DIM, T> for NDimArray<TIndexer,DIM,T,Storage>  
+	where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
+	Storage:Index<usize,Output=T>+IndexMut<usize>  {
+	fn parallel_iter_pair<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
+		where Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'ext_env+Sync+Send,
+		TScopeCreator: ThreadScopeCreator+Sync,
+			T:Send+Sync {
+		todo!()
+	}
+	fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
+		where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'ext_env+Sync+Send,
+		TScopeCreator: ThreadScopeCreator+Sync,
+		T:Send+Sync,
+	{
+		for mut_dim in 0..DIM {
+			struct AScopeUser<'env,Func,TIndexer,const DIM:usize,T,Storage>
+				where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
+				Storage:Index<usize,Output=T>+IndexMut<usize>
+			{
+				values:&'env mut NDimArray<TIndexer,DIM,T,Storage>,
+				mut_dim:usize,
+				func:&'env Func,
+				plus_1:bool,
+			}
+			impl<'env,Func,TIndexer,const DIM:usize,T,Storage> ThreadScopeUser<'env> for AScopeUser<'env,Func,TIndexer,DIM,T,Storage> 
+				where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
+				Storage:Index<usize,Output=T>+IndexMut<usize>,
+				Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'env+Sync+Send,
+				T:Send+Sync,
+				
+			{
+				fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
+					where TScope:'scope+scope_no_ret::ThreadScope<'scope>,
+						'env:'scope {
+					let rem=if self.plus_1 {0} else {1};
+					let values=self.values;
+					let n_dim_index:&TIndexer=unsafe {
+						transmute(&values.n_dim_index)
+					};
+					let mut_dim=self.mut_dim;
+					let func=self.func;
+					for p in n_dim_index.iter() {
+						if p[mut_dim]%2==rem {
+							continue;
+						}
+						let mut p2=p.clone();
+						p2[mut_dim]+=1;
+						if let Some(v1)=unsafe{values.get_mut_other(&p)}{
+							if let Some(v2)=unsafe{values.get_mut_other(&p2)}{
+								scope.spawn( move||{
+									(func)(v1,v2,mut_dim);
+								});
+							}
+						}
+					}
+				}
+			}
+			scope_creator.scope(
+				AScopeUser{values:self,mut_dim,func:&func,plus_1:false}
+			);
+			scope_creator.scope(
+				AScopeUser{values:self,mut_dim,func:&func,plus_1:true}
+			);
+		}
+	}
 }
 
 #[derive(Debug)]
