@@ -298,7 +298,56 @@ impl<TIndexer,const DIM:usize,T,Storage> TNDimArrayParallelIterPair<DIM, T> for 
 		where Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'ext_env+Sync+Send,
 		TScopeCreator: ThreadScopeCreator+Sync,
 			T:Send+Sync {
-		todo!()
+		for mut_dim in 0..DIM {
+			struct AScopeUser<'env,Func,TIndexer,const DIM:usize,T,Storage>
+				where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
+				Storage:Index<usize,Output=T>+IndexMut<usize>
+			{
+				values:&'env NDimArray<TIndexer,DIM,T,Storage>,
+				mut_dim:usize,
+				func:&'env Func,
+				plus_1:bool,
+			}
+			impl<'env,Func,TIndexer,const DIM:usize,T,Storage> ThreadScopeUser<'env> for AScopeUser<'env,Func,TIndexer,DIM,T,Storage> 
+				where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
+				Storage:Index<usize,Output=T>+IndexMut<usize>,
+				Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'env+Sync+Send,
+				T:Send+Sync,
+				
+			{
+				fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
+					where TScope:'scope+scope_no_ret::ThreadScope<'scope>,
+						'env:'scope {
+					let rem=if self.plus_1 {0} else {1};
+					let values=self.values;
+					let n_dim_index:&TIndexer=unsafe {
+						transmute(&values.n_dim_index)
+					};
+					let mut_dim=self.mut_dim;
+					let func=self.func;
+					for p in n_dim_index.iter() {
+						if p[mut_dim]%2==rem {
+							continue;
+						}
+						let mut p2=p.clone();
+						p2[mut_dim]+=1;
+						if let Some(v1)=unsafe{values.get_other(&p)}{
+							if let Some(v2)=unsafe{values.get_other(&p2)}{
+								scope.spawn( move||{
+									(func)(v1,v2,mut_dim);
+								});
+							}
+						}
+					}
+				}
+			}
+			scope_creator.scope(
+				AScopeUser{values:self,mut_dim,func:&func,plus_1:false}
+			);
+			scope_creator.scope(
+				AScopeUser{values:self,mut_dim,func:&func,plus_1:true}
+			);
+		}
 	}
 	fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
 		where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'ext_env+Sync+Send,
