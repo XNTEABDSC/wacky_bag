@@ -19,6 +19,7 @@ pub struct NDimIndexer<const DIM:usize>{
 pub trait TNDimIndexer<const DIM:usize> {
     fn length(&self) -> impl Deref<Target=usize>;
     fn lens(&self)->impl Deref<Target=[Range<isize>;DIM]>;
+	fn steps(&self)->&[usize;DIM];
     // fn length(&self)->&Range<isize>;
 
     
@@ -47,11 +48,11 @@ impl<const DIM:usize> NDimIndexer<DIM> {
         Self { starts, steps, range_u:total_len as usize, lens }
     }
     pub fn starts(&self)->&[isize;DIM]{&self.starts}
-    pub fn steps(&self)->&[usize;DIM]{&self.steps}
 }
 
 impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
     fn lens(&self)->impl Deref<Target = [std::ops::Range<isize>; DIM]>{&self.lens}
+	fn steps(&self)->&[usize;DIM]{&self.steps}
     // fn length(&self)->&Range<isize>{&self.range}
     fn length(&self)->impl Deref<Target = usize>{&self.range_u}
 
@@ -121,32 +122,32 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
 	}
 }
 
-struct SteppingIndexIteratorFunction;
+// struct SteppingIndexIteratorFunction;
 
-impl<'a> SteppingIteratorFunction<&'a mut isize, &'a Range<isize>> for SteppingIndexIteratorFunction {
-	fn step(&mut self, i:&mut isize, lens:&'a Range<isize>, _:usize)->ControlFlow<(),()> {
-		*i+=1;
-		if *i>=lens.end{
-			*i=lens.start;
-			return ControlFlow::Continue(());
-		}else {
-			return ControlFlow::Break(());
-		}
-	}
-}
-
-
-// fn index_loop(i:&mut isize,lens:&Range<isize>,_:usize)->ControlFlow<(),()> {
-// 	*i+=1;
-// 	if *i>=lens.end{
-// 		*i=lens.start;
-// 		return ControlFlow::Continue(());
-// 	}else {
-// 		return ControlFlow::Break(());
+// impl<'a> SteppingIteratorFunction<&'a mut isize, &'a Range<isize>> for SteppingIndexIteratorFunction {
+// 	fn step(&mut self, i:&mut isize, lens:&'a Range<isize>, _:usize)->ControlFlow<(),()> {
+// 		*i+=1;
+// 		if *i>=lens.end{
+// 			*i=lens.start;
+// 			return ControlFlow::Continue(());
+// 		}else {
+// 			return ControlFlow::Break(());
+// 		}
 // 	}
 // }
 
-type ANDimIndexIter<const DIM:usize>=SteppingIterator<DIM, NDimIndex<DIM>, [Range<isize>;DIM], SteppingIndexIteratorFunction>;
+
+// // fn index_loop(i:&mut isize,lens:&Range<isize>,_:usize)->ControlFlow<(),()> {
+// // 	*i+=1;
+// // 	if *i>=lens.end{
+// // 		*i=lens.start;
+// // 		return ControlFlow::Continue(());
+// // 	}else {
+// // 		return ControlFlow::Break(());
+// // 	}
+// // }
+
+// type ANDimIndexIter<const DIM:usize>=SteppingIterator<DIM, NDimIndex<DIM>, [Range<isize>;DIM], SteppingIndexIteratorFunction>;
 
 
 pub struct NDimIndexIter<const DIM:usize,Lens> {

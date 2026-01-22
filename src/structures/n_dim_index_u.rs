@@ -57,6 +57,10 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexerU<DIM> {
 	fn lens(&self)->impl Deref<Target = [std::ops::Range<isize>; DIM]> {
 		Just(self.lens.map(|l|0isize..(l as isize)))
 	}
+	
+	fn steps(&self)->&[usize;DIM] {
+		&self.steps
+	}
 
 	fn contains(&self,indexes:&super::n_dim_index::NDimIndex<DIM>)->bool {
 		self.lens.iter().zip(indexes.iter()).try_for_each(|(l,a)|{
