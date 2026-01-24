@@ -1,6 +1,6 @@
 use std::{array, mem::transmute, ops::{Deref, Index, IndexMut, Range}};
 
-use crate::{structures::n_dim_index::{NDimIndex, NDimIndexer, TNDimIndexer}, traits::scope_no_ret::{self, ThreadScopeCreator, ThreadScopeCreatorStd, ThreadScopeUser}};
+use crate::{structures::{n_dim_index::{NDimIndex, NDimIndexer, TNDimIndexer}, n_dim_index_operator::NDimIndexOperator}, traits::scope_no_ret::{self, ThreadScopeCreator, ThreadScopeCreatorStd, ThreadScopeUser}};
 
 #[derive(Debug)]
 pub struct NDimArray<TIndexer,const DIM:usize,T,Storage>
@@ -42,58 +42,42 @@ pub trait TNDimArray<const DIM:usize,T>
 		T:Send+Sync;
 }
 
-pub trait TNDimArrayGetWithNeiborhoods<const DIM:usize,T> : TNDimArray<DIM,T>  {
-	fn get_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
-		where ForNeiborhood:Fn(&'a Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult;
+pub trait TNDimArrayGetWithNeiborhoods<'a,const DIM:usize,T> : TNDimArray<DIM,T>  {
+	type TIndexer:Deref<Target : TNDimIndexer<DIM>>+'a;
+	fn get_with_neiborhoods_generic<ForNeiborhood,NeiborhoodResult>(&'a self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
+	where ForNeiborhood:Fn(&Self,&mut NDimIndexOperator<DIM,Self::TIndexer>,usize,bool,bool)->NeiborhoodResult;
 
-	fn get_mut_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a mut self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,NeiborhoodResult>>
-		where ForNeiborhood:FnMut(&mut Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult;
+	fn get_mut_with_neiborhoods_generic<ForNeiborhood,NeiborhoodResult>(&'a mut self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,NeiborhoodResult>>
+	where ForNeiborhood:FnMut(&mut Self,&mut NDimIndexOperator<DIM,Self::TIndexer>,usize,bool,bool)->NeiborhoodResult;
 
 	
-	fn get_with_neiborhoods<'a>(&'a self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,Option<&'a T>>>{
-		self.get_with_neiborhoods_generic(index,|s,i,_,_|s.get(i))
+	fn get_with_neiborhoods(&'a self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,Option<&'a T>>>{
+		self.get_with_neiborhoods_generic(index,|s,i,_,_,c|
+			if c {None} else { unsafe{transmute(s.get(i.get()))}}
+		)
 	}
 
-	fn get_mut_with_neiborhoods_mut<'a>(&'a mut self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a mut T>>>{
-		self.get_mut_with_neiborhoods_generic(index,|s,i,_,_|unsafe{transmute(s.get_mut(i))})
+	fn get_mut_with_neiborhoods_mut(&'a mut self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a mut T>>>{
+		self.get_mut_with_neiborhoods_generic(index,|s,i,_,_,c|
+			if c {None} else { unsafe{transmute(s.get_mut(i.get()))}}
+		)
 	}
 
-	fn get_mut_with_neiborhoods<'a>(&'a mut self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a T>>>{
-		self.get_mut_with_neiborhoods_generic(index,|s,i,_,_|unsafe{transmute(s.get(i))})
+	fn get_mut_with_neiborhoods(&'a mut self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a T>>>{
+		self.get_mut_with_neiborhoods_generic(index,|s,i,_,_,c|
+			if c {None} else { unsafe{transmute(s.get(i.get()))}}
+		)
 	}
 
-	fn get_with_neiborhoods_loop<'a>(&'a self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,Option<&'a T>>>{
-		self.get_with_neiborhoods_generic(index,|s,i,dim,dir|{
-			let range=&self.lens()[dim];
-			if dir {
-				if i[dim]>=range.end {
-					i[dim]-=range.end - range.start;
-				}
-			}else {
-				if i[dim]<range.start {
-					i[dim]+=range.end - range.start;
-				}
-			}
-			s.get(i)
-		})
+	fn get_with_neiborhoods_loop(&'a self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,Option<&'a T>>>{
+		self.get_with_neiborhoods_generic(index,|s,i,_,_,_|
+			unsafe{transmute(s.get(i.get()))}
+		)
 	}
 
-	fn get_mut_with_neiborhoods_loop<'a>(&'a mut self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a T>>>{
-		self.get_mut_with_neiborhoods_generic(index,|s,i,dim,dir|{
-			let range=&s.lens()[dim];
-			if range.end-range.start<=1 {
-				return None;
-			}
-			if dir {
-				if i[dim]>=range.end {
-					i[dim]-=range.end - range.start;
-				}
-			}else {
-				if i[dim]<range.start {
-					i[dim]+=range.end - range.start;
-				}
-			}
-			unsafe{transmute(s.get(i))}
+	fn get_mut_with_neiborhoods_loop(&'a mut self,index:&NDimIndex<DIM>)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,Option<&'a T>>>{
+		self.get_mut_with_neiborhoods_generic(index,|s,i,_,_,_|{
+			unsafe{transmute(s.get(i.get()))}
 		})
 	}
 }
@@ -116,6 +100,10 @@ impl<TIndexer,const DIM:usize,T,Storage> NDimArray<TIndexer,DIM,T,Storage>
 {
 	pub fn new(n_dim_index:TIndexer,values:Storage)->Self{Self{values,n_dim_index}}
 
+	pub fn unwrap_ref(&self)->(&TIndexer,&Storage){(&self.n_dim_index,&self.values)}
+
+	pub fn unwrap_mut(&mut self)->(&mut TIndexer,&mut Storage){(&mut self.n_dim_index,&mut self.values)}
+
 	pub fn n_dim_index(&self)->&TIndexer{&self.n_dim_index}
 	
 	pub fn get_with_compressed(&self,index:usize)->Option<&T> {
@@ -128,6 +116,9 @@ impl<TIndexer,const DIM:usize,T,Storage> NDimArray<TIndexer,DIM,T,Storage>
 	}
 	pub fn values(&self)->&Storage {
 		&self.values
+	}
+	pub fn values_mut(&mut self)->&mut Storage{
+		&mut self.values
 	}
 	pub unsafe fn get_other<'a,'b>(&'a self,indexes:&NDimIndex<DIM>)->Option<&'b T>
 	{
@@ -243,51 +234,59 @@ impl<TIndexer,const DIM:usize,T,Storage> TNDimArray<DIM, T> for NDimArray<TIndex
 	
 }
 
-impl<TIndexer,const DIM:usize,T,Storage> TNDimArrayGetWithNeiborhoods<DIM, T> for NDimArray<TIndexer,DIM,T,Storage>  
-	where TIndexer:Deref<Target : TNDimIndexer<DIM>>,
-	Storage:Index<usize,Output=T>+IndexMut<usize>{
-	fn get_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
-		where ForNeiborhood:Fn(&'a Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult
+impl<'a,TIndexer,const DIM:usize,T,Storage> TNDimArrayGetWithNeiborhoods<'a,DIM, T> for NDimArray<TIndexer,DIM,T,Storage>  
+	where TIndexer:Deref<Target : TNDimIndexer<DIM>+'a>,
+	Storage:Index<usize,Output=T>+IndexMut<usize>
+{
+	fn get_with_neiborhoods_generic<ForNeiborhood,NeiborhoodResult>(&'a self,index:&NDimIndex<DIM>,for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a T,NeiborhoodResult>>
+		where ForNeiborhood:Fn(&Self,&mut NDimIndexOperator<DIM,Self::TIndexer>,usize,bool,bool)->NeiborhoodResult
 	{
-		self.get(index).map(|res_cur|{
+		let op_may=NDimIndexOperator::from_index(unsafe {
+			transmute(self.n_dim_index.deref())
+		}, *index);
+		if let Some(op)=op_may{
+			let res=unsafe {transmute(self.values.index(op.get_compressed()))};
 			let res_neiborhoods = array::from_fn(|dim|{
-				let mut nindex_0=index.clone();
-				nindex_0[dim]+=1;
-				let res_0=for_neiborhood(self,&mut nindex_0,dim,true);
-				let mut nindex_1=index.clone();
-				nindex_1[dim]-=1;
-				let res_1=for_neiborhood(self,&mut nindex_1,dim,false);
-				return ((res_0,nindex_0),(res_1,nindex_1));
+				let mut nindex_0=op.clone();
+				let c_0=nindex_0.move_n_at_dim(dim, 1);
+				let res_0=for_neiborhood(self,&mut nindex_0,dim,true,c_0!=0);
+				let mut nindex_1=op.clone();
+				let c_1=nindex_0.move_n_at_dim(dim, -1);
+				let res_1=for_neiborhood(self,&mut nindex_1,dim,false,c_1!=0);
+				return ((res_0,nindex_0.get().clone()),(res_1,nindex_1.get().clone()));
 
 			});
-			NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods }
-		})
-	}
-
-	fn get_mut_with_neiborhoods_generic<'a,ForNeiborhood,NeiborhoodResult>(&'a mut self,index:&NDimIndex<DIM>,mut for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,NeiborhoodResult>>
-		where ForNeiborhood:FnMut(&mut Self,&mut NDimIndex<DIM>,usize,bool)->NeiborhoodResult
-	{
-		let res_cur_may=unsafe {
-			self.get_mut_other(index)
-		};
-
-		if let Some(res_cur)=res_cur_may{
-
-			let res_neiborhoods = array::from_fn(|dim|{
-				let mut nindex_0=index.clone();
-				nindex_0[dim]+=1;
-				let res_0=for_neiborhood(self,&mut nindex_0,dim,true);
-				let mut nindex_1=index.clone();
-				nindex_1[dim]-=1;
-				let res_1=for_neiborhood(self,&mut nindex_1,dim,false);
-				return ((res_0,nindex_0),(res_1,nindex_1));
-
-			});
-			return Some(NDimArrayGetWithNeiborhoodsResult { cur: res_cur, neiborhoods: res_neiborhoods });
-		}else {
-			return None;
+			return Some(NDimArrayGetWithNeiborhoodsResult { cur: res, neiborhoods: res_neiborhoods });
 		}
+		
+		return None;
 	}
+
+	fn get_mut_with_neiborhoods_generic<ForNeiborhood,NeiborhoodResult>(&'a mut self,index:&NDimIndex<DIM>,mut for_neiborhood:ForNeiborhood)->Option<NDimArrayGetWithNeiborhoodsResult<DIM,&'a mut T,NeiborhoodResult>>
+	where ForNeiborhood:FnMut(&mut Self,&mut NDimIndexOperator<DIM,Self::TIndexer>,usize,bool,bool)->NeiborhoodResult
+	{
+		let op_may=NDimIndexOperator::from_index(unsafe {
+			transmute(self.n_dim_index.deref())
+		}, *index);
+		if let Some(op)=op_may{
+			let res=unsafe {transmute(self.values.index_mut(op.get_compressed()))};
+			let res_neiborhoods = array::from_fn(|dim|{
+				let mut nindex_0=op.clone();
+				let c_0=nindex_0.move_n_at_dim(dim, 1);
+				let res_0=for_neiborhood(self,&mut nindex_0,dim,true,c_0!=0);
+				let mut nindex_1=op.clone();
+				let c_1=nindex_0.move_n_at_dim(dim, -1);
+				let res_1=for_neiborhood(self,&mut nindex_1,dim,false,c_1!=0);
+				return ((res_0,nindex_0.get().clone()),(res_1,nindex_1.get().clone()));
+
+			});
+			return Some(NDimArrayGetWithNeiborhoodsResult { cur: res, neiborhoods: res_neiborhoods });
+		}
+		
+		return None;
+	}
+
+	type TIndexer=&'a <TIndexer as Deref>::Target;
 
 }
 
@@ -439,12 +438,16 @@ mod test{
         // const ADIM:usize=3;
         let andidx=NDimIndexer::new_len([0..3,0..3,0..3]);
         let mut andarr=NDimArray::from_fn(&andidx, |idx|(idx,Vec::<NDimIndex<3>>::new()));
-		for i in andidx.iter() {
-			println!("{:?} : {:?}", i, andarr.get(&i).unwrap().0);
-		}
-		andarr.parallel_iter_pair_mut(&|a,b,_|{
+		andarr.parallel_iter_pair_mut(&|a,b,dim|{
 			// thread::sleep(time::Duration::from_millis());
-			println!("({:?},{:?})",a.0,b.0);
+			// println!("({:?},{:?})",a.0,b.0);
+			a.0.iter().zip(b.0.iter()).enumerate().for_each(|(i,(a_i,b_i))|{
+				if i==dim {
+					assert_eq!(*a_i+1,*b_i);
+				}else {
+					assert_eq!(a_i,b_i);
+				}
+			});
 			a.1.push(b.0.clone());
 			b.1.push(a.0.clone());
 		}, &ThreadScopeCreatorStd);
@@ -453,7 +456,7 @@ mod test{
         //     println!("{:#?}",got);
         // }
 		for i in andidx.iter() {
-			println!("{:?} : {:?}", i, andarr.get(&i).unwrap().1);
+			// println!("{:?} : {:?}", i, andarr.get(&i).unwrap().1);
 		}
 		
     }

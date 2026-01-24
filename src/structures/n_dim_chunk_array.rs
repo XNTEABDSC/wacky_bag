@@ -1,6 +1,6 @@
-use std::{array, mem::MaybeUninit, ops::{Deref, Div, Range, Rem}};
+use std::{array, mem::{MaybeUninit, transmute}, ops::{Deref, Div, Range, Rem}};
 
-use crate::structures::{just::Just, n_dim_array::{NDimArray, TNDimArray, TNDimArrayParallelIterPair}, n_dim_chunk::NDimChunk, n_dim_index::{NDimIndex, NDimIndexer, TNDimIndexer}, n_dim_index_u::NDimIndexerU};
+use crate::structures::{just::Just, n_dim_array::{NDimArray, TNDimArray, TNDimArrayParallelIterPair}, n_dim_chunk::NDimChunk, n_dim_index::{NDimIndex, NDimIndexer, TNDimIndexer}, n_dim_index_operator::NDimIndexOperator, n_dim_index_u::NDimIndexerU};
 
 use crate::traits::scope_no_ret::{ThreadScopeCreator, ThreadScopeUser};
 pub struct NDimChunkArray<const DIM:usize,T> 
@@ -10,6 +10,19 @@ pub struct NDimChunkArray<const DIM:usize,T>
 		Vec<NDimArray<Just<NDimIndexerU<DIM>>,DIM,T,Vec<T>>>>,
 	lens:[usize;DIM],
     dim_elem_count:usize,
+}
+
+fn merge_index<const DIM:usize>(chunks_idx:&NDimIndex<DIM>,elem_idx:&NDimIndex<DIM>,dim_elem_count:usize)->NDimIndex<DIM>{
+	array::from_fn(|dim|{chunks_idx[dim]*(dim_elem_count as isize)+elem_idx[dim]})
+}
+fn split_index<const DIM:usize>(indexes:&NDimIndex<DIM>,dim_elem_count:usize)->(NDimIndex<DIM>, NDimIndex<DIM>){
+	let split_data=indexes.map(|a|{
+		let a=a as usize;
+		(a/dim_elem_count,a%dim_elem_count)
+	});
+	let (chunks_idx,inner_idx)=(split_data.map(|(a,b)|a as isize),split_data.map(|(a,b)|b as isize));
+	return (chunks_idx,inner_idx); 
+
 }
 
 impl<const DIM:usize,T> NDimChunkArray<DIM,T>
@@ -60,20 +73,12 @@ impl<const DIM:usize,T> TNDimArray<DIM, T> for NDimChunkArray<DIM,T>
     }
 
     fn get(&self,indexes:&super::n_dim_index::NDimIndex<DIM>)->Option<&T> {
-        let split_data=indexes.map(|a|{
-			let a=a as usize;
-			(a/self.dim_elem_count,a%self.dim_elem_count)
-		});
-		let (chunks_idx,inner_idx)=(split_data.map(|(a,b)|a as isize),split_data.map(|(a,b)|b as isize));
+		let (chunks_idx,inner_idx)=split_index(indexes, self.dim_elem_count);
 		self.values.get(&chunks_idx).and_then(|a|a.get(&inner_idx))
     }
 
     fn get_mut(&mut self,indexes:&super::n_dim_index::NDimIndex<DIM>)->Option<&mut T> {
-        let split_data=indexes.map(|a|{
-			let a=a as usize;
-			(a/self.dim_elem_count,a%self.dim_elem_count)
-		});
-		let (chunks_idx,inner_idx)=(split_data.map(|(a,b)|a as isize),split_data.map(|(a,b)|b as isize));
+		let (chunks_idx,inner_idx)=split_index(indexes, self.dim_elem_count);
 		self.values.get_mut(&chunks_idx).and_then(|a|a.get_mut(&inner_idx))
     }
 
@@ -82,14 +87,24 @@ impl<const DIM:usize,T> TNDimArray<DIM, T> for NDimChunkArray<DIM,T>
 			where Func: for<'scope> Fn(&'scope T,&'scope NDimIndex<DIM>)+'ext_env+Sync+Send,
 			TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
 			T:Send+Sync {
-		todo!()
+		self.values.parallel_iter(&|a,chunks_idx|{
+			a.parallel_iter(&|b,elem_idx|{
+				let idx=merge_index(chunks_idx, elem_idx, self.dim_elem_count);
+				func(b,&idx);
+			}, scope_creator);
+		}, scope_creator);
 	}
 	
 	fn parallel_iter_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
 			where Func: for<'scope> Fn(&'scope mut T,&'scope NDimIndex<DIM>)+'ext_env+Sync+Send,
 			TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
 			T:Send+Sync {
-		todo!()
+		self.values.parallel_iter_mut(&|chunk,chunks_idx|{
+			chunk.parallel_iter_mut(&|item,elem_idx|{
+				let idx=merge_index(chunks_idx, elem_idx, self.dim_elem_count);
+				func(item,&idx);
+			}, scope_creator);
+		}, scope_creator);
 	}
 	
 	
@@ -99,16 +114,161 @@ impl<const DIM:usize,T> TNDimArrayParallelIterPair<DIM, T> for NDimChunkArray<DI
 	fn parallel_iter_pair<'ext_env,Func,TScopeCreator>(&'ext_env self,func:&Func,scope_creator:&TScopeCreator)
 		where Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'ext_env+Sync+Send,
 		TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
-			T:Send+Sync {
-		todo!()
+			T:Send+Sync 
+	{
+		self.values.parallel_iter(&|chunk,_|{
+			chunk.parallel_iter_pair(&|a,b,dim|{
+				func(a,b,dim);
+			}, scope_creator);
+		}, scope_creator);
+		self.values.parallel_iter_pair(&|chunka: &NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,chunkb,dim|{
+			struct Helper<'a,const DIM:usize,T,Func>{
+				chunka:&'a NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,
+				chunkb:&'a NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,
+				dim:usize,
+				func:&'a Func
+			}
+			impl<'env,const DIM:usize,T,Func> ThreadScopeUser<'env> for Helper<'env,DIM,T,Func>
+				where Func: for<'scope> Fn(&'scope T,&'scope T,usize)+'env+Sync+Send,
+				T:Send+Sync 
+			{
+				fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
+					where 'env:'scope,
+							TScope:crate::traits::scope_no_ret::ThreadScope<'scope> {
+					let (chunka,chunkb,dim,func)=(self.chunka,self.chunkb,self.dim,self.func);
+					let a_uw=chunka.unwrap_ref();
+					let b_uw=chunkb.unwrap_ref();
+					let a_end_i=a_uw.0.lens()[dim] as isize-1;
+					let mut a_idx_op=NDimIndexOperator::from_index(a_uw.0.deref(), array::from_fn::<_,DIM,_>(|d|{
+						if d==dim{a_end_i} else {0}
+					})).unwrap();
+					let mut b_idx_op = NDimIndexOperator::from_index(b_uw.0.deref(), [0;DIM]).unwrap();
+					
+					loop {
+						let a_item=unsafe {
+							transmute(&a_uw.1[a_idx_op.get_compressed()])
+						};
+						let b_item=unsafe {
+							transmute(&b_uw.1[b_idx_op.get_compressed()])
+						};
+						scope.spawn(move ||{
+							func(a_item,b_item,dim);
+						});
+						// func(&mut a_uw.1[a_idx_op.get_compressed()],&mut b_uw.1[b_idx_op.get_compressed()],dim);
+						let c=a_idx_op.move_n_carry(1);
+						if c!=0 {break;}// iterating is over
+						let mut dim_carry=false;
+
+						if a_idx_op.get()[dim]==0 {// a idx change at mid
+							a_idx_op.set_n_at_dim(dim, a_end_i);
+							if cfg!(debug_assertions){
+								dim_carry=true;
+							}
+						}
+						let c=b_idx_op.move_n_carry(1);
+						if c!=0 {// iterating is over
+							debug_assert!(false,"not synchronous carry of 2 index iterating");
+							break;
+						}
+						if b_idx_op.get()[dim]!=0 {// b idx change at mid
+							b_idx_op.set_n_at_dim(dim, 0);
+							if 1<=dim {
+								let c=b_idx_op.move_n_carry_at_dim(dim-1, 1);
+								if c!=0 {// iterating is over
+									debug_assert_eq!(dim_carry,true,"not synchronous carry of 2 index iterating");
+									break;
+								}
+							}else {// iterating is over
+								debug_assert!(false,"not synchronous carry of 2 index iterating");
+								break;
+							}
+						}
+					}
+				}
+			}
+			scope_creator.scope(Helper{
+				chunka,chunkb,dim,func
+			});
+		}, scope_creator);
 	}
 	fn parallel_iter_pair_mut<'ext_env,Func,TScopeCreator>(&'ext_env mut self,func:&Func,scope_creator:&TScopeCreator)
         where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'ext_env+Sync+Send,
-        TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
+        	TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
             T:Send+Sync 
 	{
-		self.values.parallel_iter_mut(&|a,idx|{
-			a.parallel_iter_pair_mut(func, scope_creator);
+		self.values.parallel_iter_mut(&|chunk,_|{
+			chunk.parallel_iter_pair_mut(&|a,b,dim|{
+				func(a,b,dim);
+			}, scope_creator);
+		}, scope_creator);
+		self.values.parallel_iter_pair_mut(&|chunka: &mut NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,chunkb,dim|{
+			struct Helper<'a,const DIM:usize,T,Func>{
+				chunka:&'a mut NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,
+				chunkb:&'a mut NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,
+				dim:usize,
+				func:&'a Func
+			}
+			impl<'env,const DIM:usize,T,Func> ThreadScopeUser<'env> for Helper<'env,DIM,T,Func>
+				where Func: for<'scope> Fn(&'scope mut T,&'scope mut T,usize)+'env+Sync+Send,
+				T:Send+Sync 
+			{
+				fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
+					where 'env:'scope,
+							TScope:crate::traits::scope_no_ret::ThreadScope<'scope> {
+					let (chunka,chunkb,dim,func)=(self.chunka,self.chunkb,self.dim,self.func);
+					let a_uw=chunka.unwrap_mut();
+					let b_uw=chunkb.unwrap_mut();
+					let a_end_i=a_uw.0.lens()[dim] as isize-1;
+					let mut a_idx_op=NDimIndexOperator::from_index(a_uw.0.deref().deref(), array::from_fn::<_,DIM,_>(|d|{
+						if d==dim{a_end_i} else {0}
+					})).unwrap();
+					let mut b_idx_op = NDimIndexOperator::from_index(b_uw.0.deref().deref(), [0;DIM]).unwrap();
+					
+					loop {
+						let a_item=unsafe {
+							transmute(&mut a_uw.1[a_idx_op.get_compressed()])
+						};
+						let b_item=unsafe {
+							transmute(&mut b_uw.1[b_idx_op.get_compressed()])
+						};
+						scope.spawn(move ||{
+							func(a_item,b_item,dim);
+						});
+						// func(&mut a_uw.1[a_idx_op.get_compressed()],&mut b_uw.1[b_idx_op.get_compressed()],dim);
+						let c=a_idx_op.move_n_carry(1);
+						if c!=0 {break;}// iterating is over
+						let mut dim_carry=false;
+
+						if a_idx_op.get()[dim]==0 {// a idx change at mid
+							a_idx_op.set_n_at_dim(dim, a_end_i);
+							if cfg!(debug_assertions){
+								dim_carry=true;
+							}
+						}
+						let c=b_idx_op.move_n_carry(1);
+						if c!=0 {// iterating is over
+							debug_assert!(false,"not synchronous carry of 2 index iterating");
+							break;
+						}
+						if b_idx_op.get()[dim]!=0 {// b idx change at mid
+							b_idx_op.set_n_at_dim(dim, 0);
+							if 1<=dim {
+								let c=b_idx_op.move_n_carry_at_dim(dim-1, 1);
+								if c!=0 {// iterating is over
+									debug_assert_eq!(dim_carry,true,"not synchronous carry of 2 index iterating");
+									break;
+								}
+							}else {// iterating is over
+								debug_assert!(false,"not synchronous carry of 2 index iterating");
+								break;
+							}
+						}
+					}
+				}
+			}
+			scope_creator.scope(Helper{
+				chunka,chunkb,dim,func
+			});
 		}, scope_creator);
     }
 	
@@ -176,7 +336,11 @@ impl<'a,const DIM:usize,T> IntoIterator for&'a NDimChunkArray<DIM,T>  {
 
 #[cfg(test)]
 mod test{
-	use super::*;
+	use std::sync::{Arc, Mutex};
+
+use crate::traits::scope_no_ret::ThreadScopeCreatorStd;
+
+use super::*;
 	#[test]
 	fn test_chunks_lens(){
 		let chunk_array=NDimChunkArray::<2,i32>::from_fn([10,15],4,|idx|{
@@ -208,6 +372,73 @@ mod test{
 			for j in 0..15 {
 				assert_eq!(*chunk_array.get(&[i as isize,j as isize]).unwrap(), (i*100+j) as i32);
 			}
+		}
+	}
+	#[test]
+	fn test_par_iter(){
+		let ranges=[10,15,7];
+		let chunk_array=NDimChunkArray::<3,NDimIndex<3>>::from_fn(ranges,4,|idx|{
+			*idx
+		});
+		let count=Arc::new(Mutex::new(0));
+		let exp_count=ranges.iter().fold(1, |a,b|a*b);
+		chunk_array.parallel_iter(&|v,idx|{
+			assert_eq!(v,idx);
+			// print!("{:?}",idx);
+			*(count.lock().unwrap())+=1;
+		}, &ThreadScopeCreatorStd);
+		assert_eq!(*count.lock().unwrap(),exp_count);
+	}
+
+	#[test]
+	fn test_shape(){
+		const DIM:usize=3;
+		let ranges=[3,3,3];
+		let mut chunk_array=NDimChunkArray::from_fn(ranges,2,|idx|{
+			(*idx,array::from_fn::<Option<NDimIndex<DIM>>,DIM,_>(|_|None))
+		});
+		for a in chunk_array.values.n_dim_index().iter() {
+			println!("{:?}'s shape: {:?}",a,chunk_array.values.get(&a).unwrap().n_dim_index().lens());
+		}
+	}
+
+	#[test]
+	fn test_par_iter_pair(){
+		const DIM:usize=3;
+		let ranges=[3,3,3];
+		let mut chunk_array=NDimChunkArray::from_fn(ranges,2,|idx|{
+			(*idx,array::from_fn::<Option<NDimIndex<DIM>>,DIM,_>(|_|None))
+		});
+		// let count=Arc::new(Mutex::new(0));
+		// let exp_count=ranges.iter().fold(1, |a,b|a*(b-1))*DIM;
+		chunk_array.parallel_iter_pair_mut(&|a,b,dim_idx|{
+			println!("({:?},{:?}) at {}",a.0,b.0,dim_idx);
+			a.1[dim_idx]=Some(b.0.clone());
+			// *count.lock().unwrap()+=1;
+		}, &ThreadScopeCreatorStd);
+		// assert_eq!(*count.lock().unwrap(),exp_count);
+		for a in chunk_array.iter() {
+			println!("{:?}",a);
+		}
+	}
+
+	#[test]
+	fn test_par_iter_pair_edge(){
+		const DIM:usize=3;
+		let ranges=[3,3,3];
+		let mut chunk_array=NDimChunkArray::from_fn(ranges,1,|idx|{
+			(*idx,array::from_fn::<Option<NDimIndex<DIM>>,DIM,_>(|_|None))
+		});
+		// let count=Arc::new(Mutex::new(0));
+		// let exp_count=ranges.iter().fold(1, |a,b|a*(b-1))*DIM;
+		chunk_array.parallel_iter_pair_mut(&|a,b,dim_idx|{
+			println!("({:?},{:?}) at {}",a.0,b.0,dim_idx);
+			a.1[dim_idx]=Some(b.0.clone());
+			// *count.lock().unwrap()+=1;
+		}, &ThreadScopeCreatorStd);
+		// assert_eq!(*count.lock().unwrap(),exp_count);
+		for a in chunk_array.iter() {
+			println!("{:?}",a);
 		}
 	}
 }

@@ -12,7 +12,7 @@ pub type NDimIndex<const DIM:usize>=[isize;DIM];
 pub struct NDimIndexer<const DIM:usize>{
     starts:[isize;DIM],
     steps:[usize;DIM],
-    range_u:usize,
+    length:usize,
     lens:[Range<isize>;DIM],
 }
 
@@ -38,14 +38,14 @@ impl<const DIM:usize> NDimIndexer<DIM> {
     pub fn new_len(lens:[Range<isize>;DIM])->Self{
         let mut starts=[0isize;DIM];
         let mut steps=[0usize;DIM];
-        let mut total_len:usize=1;
+        let mut cur_length:usize=1;
         for i in (0..DIM).rev() {
             starts[i]=lens[i].start;
-            steps[i]=total_len;
+            steps[i]=cur_length;
             let dim_len= (lens[i].end-lens[i].start) as usize;
-            total_len*=dim_len;
+            cur_length*=dim_len;
         }
-        Self { starts, steps, range_u:total_len as usize, lens }
+        Self { starts, steps, length:cur_length as usize, lens }
     }
     pub fn starts(&self)->&[isize;DIM]{&self.starts}
 }
@@ -54,7 +54,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
     fn lens(&self)->impl Deref<Target = [std::ops::Range<isize>; DIM]>{&self.lens}
 	fn steps(&self)->&[usize;DIM]{&self.steps}
     // fn length(&self)->&Range<isize>{&self.range}
-    fn length(&self)->impl Deref<Target = usize>{&self.range_u}
+    fn length(&self)->impl Deref<Target = usize>{&self.length}
 
     fn contains(&self,indexes:&NDimIndex<DIM>)->bool{
         //let mut pass=true;
@@ -69,7 +69,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
     }
 
     fn contains_compressed(&self,index:usize)->bool{
-        index<self.range_u
+        index<self.length
     }
     
     fn compress_index(&self,indexes:&NDimIndex<DIM>)->usize{
@@ -113,10 +113,10 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
 			+ (self.steps[dim] as isize)*add_index
 			;
 		while new_compressed<0 {
-			new_compressed+=self.range_u as isize;
+			new_compressed+=self.length as isize;
 		}
-		while new_compressed>=self.range_u as isize {
-			new_compressed-=self.range_u as isize;
+		while new_compressed>=self.length as isize {
+			new_compressed-=self.length as isize;
 		}
 		return new_compressed as usize;
 	}

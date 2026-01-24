@@ -31,19 +31,17 @@ impl<'a,const DIM:usize> Iterator for NDimIndexUIter<'a,DIM> {
         let res=self.cur.clone();
         let cur=&mut self.cur;
         let lens=&self.lens;
-        let mut i=0;
-        loop {
-            cur[i]+=1;
-            if cur[i]>=lens[i]{
-                cur[i]=0;
-                i+=1;
-                if i>=lens.len(){
-                    self.ended=true;
-                    break;
-                }
+        let iterate=cur.iter_mut().zip((&lens).into_iter()).rev().try_for_each(|(c,l)|{
+            *c+=1;
+            if *c>=*l{
+                *c=0;
+                return ControlFlow::Continue(());
             }else {
-                break;
+                return ControlFlow::Break(());
             }
+        });
+        if iterate.is_continue() {
+            self.ended=true;
         }
         return Some(res);
     }
@@ -125,13 +123,14 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
     pub fn length(&self)->usize{self.length}
 
     pub fn new_len(lens:[usize;DIM])->Self{
-        let mut cur=1;
-        let base=array::from_fn(|i|{
-            let res=cur;
-            cur=cur*lens[i];
-            res
-        });
-        Self{steps: base,length:cur,lens}
+        let mut steps=[0usize;DIM];
+        let mut cur_length:usize=1;
+        for i in (0..DIM).rev() {
+            steps[i]=cur_length;
+            let dim_len= lens[i];
+            cur_length*=dim_len;
+        }
+        Self{steps,length:cur_length,lens}
     }
 
 	pub fn contains_u(&self,indexes:NDimIndexU<DIM>)->bool{
@@ -153,14 +152,12 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
     }
     /* */
     pub fn decompress_index_u(&self,mut compressed_index:usize)->NDimIndexU<DIM>{
-
-        let res:[usize;DIM]=array::from_fn(|i|{
+        array::from_fn(|i|{
             let step=self.lens[i];
             let (div,rem)=(compressed_index/step,compressed_index%step);
             compressed_index=div;
             rem
-        });
-        res
+        })
     }
     pub fn iter_u<'a>(&'a self)->NDimIndexUIter<'a,DIM> {
         NDimIndexUIter::new(&self.lens)
