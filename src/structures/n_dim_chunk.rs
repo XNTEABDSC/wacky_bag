@@ -65,8 +65,8 @@ pub fn get_chunk_n_dim_indexer_u<T,const DIM:usize>(chunk_size:usize)->&'static 
     get_cached_n_dim_indexer_u::<DIM>(dim_elem_count)
 }
 
-/// 64KB
-pub const COMMON_CHUNK_SIZE:usize=64*1024;
+/// 32KB
+pub const COMMON_CHUNK_SIZE:usize=32*1024;
 
 pub fn from_fn<T,const DIM:usize,Func>(mut f:Func,chunk_size:usize)->NDimChunk<T,DIM>
 	where Func:FnMut(NDimIndex<DIM>)->T
