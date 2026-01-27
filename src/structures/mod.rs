@@ -6,16 +6,12 @@ pub mod idtrait;
 pub mod doubly_grid_layers;
 // pub mod cached_iter;
 pub mod doubly_slice_layers;
-pub mod n_dim_index_u;
-pub mod n_dim_array;
-pub mod n_dim_index;
 pub mod just;
-pub mod n_dim_chunk;
+
+pub mod n_dim_array;
 // pub mod n_dim_index_2;
 pub mod typed_deref;
-pub mod n_dim_chunk_array;
 pub mod step_iter;
-pub mod n_dim_index_operator;
 // pub mod countable_range_std;
 // pub mod countable_range_merge;
 

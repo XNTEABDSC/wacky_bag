@@ -1,6 +1,6 @@
 use std::{any::Any, array, collections::HashMap, sync::{LazyLock, Mutex}};
 
-use crate::{structures::{n_dim_array::NDimArray, n_dim_index::{NDimIndex, TNDimIndexer}, n_dim_index_u::NDimIndexerU}, utils::dim_root_of_x_usize::get_dim_root_of_x_usize};
+use crate::{structures::n_dim_array::{n_dim_array::NDimArray, n_dim_index::NDimIndex, n_dim_indexer_u::NDimIndexerU, t_n_dim_indexer::TNDimIndexer}, utils::dim_root_of_x_usize::get_dim_root_of_x_usize};
 
 pub type NDimChunk<T,const  DIM:usize>=NDimArray<&'static NDimIndexerU<DIM>,DIM,T,Vec<T>>;
 

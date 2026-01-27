@@ -1,6 +1,6 @@
 use std::ops::{ControlFlow, Deref};
 
-use crate::{structures::n_dim_index::{NDimIndex, TNDimIndexer}, utils::loop_wrap::loop_wrap_assign};
+use crate::{structures::n_dim_array::{n_dim_index::NDimIndex, t_n_dim_indexer::TNDimIndexer}, utils::loop_wrap::loop_wrap_assign};
 
 
 #[derive(Clone, Copy)]
@@ -103,7 +103,9 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 
 #[cfg(test)]
 mod test{
-	use crate::structures::n_dim_index::{NDimIndexer};
+	
+
+	use crate::structures::n_dim_array::n_dim_indexer::NDimIndexer;
 
 	use super::*;
 	#[test]

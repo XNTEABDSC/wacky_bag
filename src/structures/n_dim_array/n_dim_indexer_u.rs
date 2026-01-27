@@ -1,10 +1,9 @@
 use std::{array, ops::{ControlFlow, Deref}};
 
-use crate::structures::{just::Just, n_dim_index::TNDimIndexer};
+use crate::structures::{just::Just, n_dim_array::{n_dim_index_u::NDimIndexU, t_n_dim_indexer::TNDimIndexer}};
 
 
 
-pub type NDimIndexU<const DIM:usize>=[usize;DIM];
 pub struct NDimIndexerU<const DIM:usize>{
     steps:[usize;DIM],
     length:usize,
