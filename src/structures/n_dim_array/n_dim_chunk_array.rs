@@ -1,8 +1,7 @@
-use std::{array, mem::{MaybeUninit, transmute}, ops::{Deref, Div, Range, Rem}};
+use std::{array, mem::transmute, ops::{Deref, Div, Rem}};
 
-use crate::structures::{just::Just, n_dim_array::{n_dim_array::NDimArray, n_dim_index::NDimIndex, n_dim_index_operator::NDimIndexOperator, n_dim_indexer_u::NDimIndexerU, t_n_dim_array::{TNDimArray,TNDimArrayGetWithNeiborhoods,TNDimArrayIterPair,TNDimArrayParallelIterPair}}};
+use crate::structures::{just::Just, n_dim_array::{n_dim_array::NDimArray, n_dim_index::NDimIndex, n_dim_index_operator::NDimIndexOperator, n_dim_indexer_u::NDimIndexerU, t_n_dim_array::{TNDimArray,TNDimArrayIterPair,TNDimArrayParallelIterPair}}};
 
-use crate::traits::scope_no_ret::{ThreadScopeCreator, ThreadScopeUser};
 pub struct NDimChunkArray<const DIM:usize,T> 
 {
     values:NDimArray<Just<NDimIndexerU<DIM>>,DIM,
@@ -20,7 +19,7 @@ fn split_index<const DIM:usize>(indexes:&NDimIndex<DIM>,dim_elem_count:usize)->(
 		let a=a as usize;
 		(a/dim_elem_count,a%dim_elem_count)
 	});
-	let (chunks_idx,inner_idx)=(split_data.map(|(a,b)|a as isize),split_data.map(|(a,b)|b as isize));
+	let (chunks_idx,inner_idx)=(split_data.map(|(a,_)|a as isize),split_data.map(|(_,b)|b as isize));
 	return (chunks_idx,inner_idx); 
 
 }
