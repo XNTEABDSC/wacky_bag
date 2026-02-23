@@ -166,9 +166,9 @@ where
             Func: for<'scope> Fn(&'scope T, NDimIndex<DIM>) + 'env + Sync + Send,
             T: Send + Sync,
         {
-            fn use_scope<'scope, TScope>(self, scope: &'scope TScope) -> ()
+            fn use_scope<'scope, TScope>(self, scope: TScope) -> ()
             where
-                TScope: 'scope + scope_no_ret::ThreadScope<'scope>,
+                TScope: scope_no_ret::ThreadScope<'scope>,
                 'env: 'scope,
             {
                 let func = self.func;
@@ -224,9 +224,9 @@ where
             Func: for<'scope> Fn(&'scope mut T, NDimIndex<DIM>) + 'env + Sync + Send,
             T: Send + Sync,
         {
-            fn use_scope<'scope, TScope>(self, scope: &'scope TScope) -> ()
+            fn use_scope<'scope, TScope>(self, scope: TScope) -> ()
             where
-                TScope: 'scope + scope_no_ret::ThreadScope<'scope>,
+                TScope: scope_no_ret::ThreadScope<'scope>,
                 'env: 'scope,
             {
                 let func = self.func;
@@ -484,9 +484,9 @@ where
                 Func: for<'scope> Fn(&'scope T, &'scope T, usize) + 'env + Sync + Send,
                 T: Send + Sync,
             {
-                fn use_scope<'scope, TScope>(self, scope: &'scope TScope) -> ()
+                fn use_scope<'scope, TScope>(self, scope: TScope) -> ()
                 where
-                    TScope: 'scope + scope_no_ret::ThreadScope<'scope>,
+                    TScope: scope_no_ret::ThreadScope<'scope>,
                     'env: 'scope,
                 {
                     let rem = if self.plus_1 { 0 } else { 1 };
@@ -552,9 +552,9 @@ where
                 Func: for<'scope> Fn(&'scope mut T, &'scope mut T, usize) + 'env + Sync + Send,
                 T: Send + Sync,
             {
-                fn use_scope<'scope, TScope>(self, scope: &'scope TScope) -> ()
+                fn use_scope<'scope, TScope>(self, scope:TScope) -> ()
                 where
-                    TScope: 'scope + scope_no_ret::ThreadScope<'scope>,
+                    TScope: scope_no_ret::ThreadScope<'scope>,
                     'env: 'scope,
                 {
                     let rem = if self.plus_1 { 0 } else { 1 };

@@ -6,6 +6,7 @@ pub mod bi_fn;
 //pub mod scope;
 // pub mod scope_ret;
 pub mod scope_no_ret;
+pub mod mapper;
 // pub mod scope2;
 // pub mod scope3;
 

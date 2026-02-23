@@ -1,26 +1,16 @@
 use std::{marker::PhantomData, thread::{self, ScopedJoinHandle}};
 
 pub trait ThreadScope<'scope>{
-    fn spawn<F>(&'scope self, f: F) ->()
+    fn spawn<F>(&self, f: F) ->()
         where
             F: FnOnce()->() + Send + 'scope,
 			;
     
 }
 
-impl<'scope,'env> ThreadScope<'scope> for thread::Scope<'scope,'env> {
-    fn spawn<F>(&'scope self, f: F) -> ()
-        where
-            F: FnOnce()->() + std::marker::Send + 'scope,
-    {
-        self.spawn(f);
-    }
-
-}
-
 pub trait ThreadScopeUser<'env>
 {
-    fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
+    fn use_scope<'scope,TScope>(self, scope:TScope)->()
         where 'env:'scope,
 			TScope:ThreadScope<'scope>;
 }
@@ -33,13 +23,32 @@ pub trait ThreadScopeCreator
         ;
 }
 
+pub struct ThreadScopeStd<'scope,'env>(pub &'scope thread::Scope<'scope,'env>);
+
+impl<'scope,'env> ThreadScope<'scope> for ThreadScopeStd<'scope,'env> {
+    fn spawn<F>(&self, f: F) -> ()
+        where
+            F: FnOnce()->() + std::marker::Send + 'scope,
+    {
+        self.0.spawn(f);
+    }
+}
+
+// impl<'scope,'env> ThreadScope<'scope> for thread::Scope<'scope,'env> {
+//     fn spawn<F>(&self, f: F) -> ()
+//         where
+//             F: FnOnce()->() + std::marker::Send + 'scope,
+//     {
+//         self.spawn(f);
+//     }
+// }
 pub struct ThreadScopeCreatorStd;
 
 impl ThreadScopeCreator for ThreadScopeCreatorStd {
     fn scope<'env,F>(&self,f:F ) -> ()
         where F:ThreadScopeUser<'env>
 	{
-		thread::scope(|s|f.use_scope(s));
+		thread::scope(|s|f.use_scope(ThreadScopeStd(s)));
 	}
 }
 
@@ -59,8 +68,8 @@ mod test{
             }
             impl<'env> ThreadScopeUser<'env> for AScopeUser<'env> {
 
-                fn use_scope<'scope,TScope>(self, scope:&'scope TScope)->()
-                    where TScope:'scope+ThreadScope<'scope>,
+                fn use_scope<'scope,TScope>(self, scope:TScope)->()
+                    where TScope:ThreadScope<'scope>,
                         'env:'scope {
                     let a=self.a;
                     let x=self.x;
