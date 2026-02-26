@@ -26,6 +26,7 @@ fn split_index<const DIM:usize>(indexes:&NDimIndex<DIM>,dim_elem_count:usize)->(
 
 impl<const DIM:usize,T> NDimChunkArray<DIM,T>
 {
+	/// create [NDimChunkArray] by function
     pub fn from_fn(lens:[usize;DIM],dim_elem_count:usize,mut func:impl FnMut(&NDimIndex<DIM>)->T)->Self {
         // let (dim_elem_count,chunk_elem_count)=n_dim_chunk::get_chunk_dim_elem_count::<T,DIM>(n_dim_chunk::COMMON_CHUNK_SIZE);
         let lens_split_data=lens.map(|len|{
@@ -62,7 +63,11 @@ impl<const DIM:usize,T> NDimChunkArray<DIM,T>
         }
 
     }
-    
+    /// when iterating inner chunk, whether parallel will be used.
+	/// true if there are less than 8 chunk
+	pub fn parallel_iterating_chunk(&self)->bool{
+		self.values.values().len()<8
+	}
 }
 
 impl<const DIM:usize,T> TNDimArray<DIM, T> for NDimChunkArray<DIM,T>
@@ -86,11 +91,20 @@ impl<const DIM:usize,T> TNDimArray<DIM, T> for NDimChunkArray<DIM,T>
 			where Func: for<'scope> Fn(&'scope T,NDimIndex<DIM>)+'ext_env+Sync+Send,
 			TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
 			T:Send+Sync {
+		let par_inner=self.parallel_iterating_chunk();
 		self.values.for_each_parallel(&|a,chunks_idx|{
-			a.for_each(&|b,elem_idx|{
-				let idx=merge_index(&chunks_idx, &elem_idx, self.dim_elem_count);
-				func(b,idx);
-			});
+			if par_inner {
+				a.for_each_parallel(&|b,elem_idx|{
+					let idx=merge_index(&chunks_idx, &elem_idx, self.dim_elem_count);
+					func(b,idx);
+				},scope_creator);
+			}
+			else {
+				a.for_each(&|b,elem_idx|{
+					let idx=merge_index(&chunks_idx, &elem_idx, self.dim_elem_count);
+					func(b,idx);
+				});
+			}
 		}, scope_creator);
 	}
 	
@@ -98,11 +112,19 @@ impl<const DIM:usize,T> TNDimArray<DIM, T> for NDimChunkArray<DIM,T>
 			where Func: for<'scope> Fn(&'scope mut T,NDimIndex<DIM>)+'ext_env+Sync+Send,
 			TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
 			T:Send+Sync {
+		let par_inner=self.parallel_iterating_chunk();
 		self.values.for_each_mut_parallel(&|chunk,chunks_idx|{
-			chunk.for_each_mut(&|item,elem_idx|{
-				let idx=merge_index(&chunks_idx, &elem_idx, self.dim_elem_count);
-				func(item,idx);
-			});
+			if par_inner {
+				chunk.for_each_mut_parallel(&|item,elem_idx|{
+					let idx=merge_index(&chunks_idx, &elem_idx, self.dim_elem_count);
+					func(item,idx);
+				},scope_creator);
+			}else {
+				chunk.for_each_mut(&|item,elem_idx|{
+					let idx=merge_index(&chunks_idx, &elem_idx, self.dim_elem_count);
+					func(item,idx);
+				});
+			}
 		}, scope_creator);
 	}
 	
@@ -264,10 +286,19 @@ impl<const DIM:usize,T> TNDimArrayParallelIterPair<DIM, T> for NDimChunkArray<DI
 		TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
 			T:Send+Sync 
 	{
+		let par_inner=self.parallel_iterating_chunk();
 		self.values.for_each_parallel(&|chunk,_|{
-			chunk.iter_pair(&|a,b,dim|{
-				func(a,b,dim);
-			});
+			if par_inner {
+				
+				chunk.iter_pair_parallel(&|a,b,dim|{
+					func(a,b,dim);
+				},scope_creator);
+			}else {
+				chunk.iter_pair(&|a,b,dim|{
+					func(a,b,dim);
+				});
+				
+			}
 		}, scope_creator);
 		self.values.iter_pair_parallel(&|chunka: &NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,chunkb,dim|{
 			let a_uw=chunka.unwrap_ref();
@@ -323,10 +354,18 @@ impl<const DIM:usize,T> TNDimArrayParallelIterPair<DIM, T> for NDimChunkArray<DI
         	TScopeCreator: crate::traits::scope_no_ret::ThreadScopeCreator+Sync,
             T:Send+Sync 
 	{
+		
+		let par_inner=self.parallel_iterating_chunk();
 		self.values.for_each_mut_parallel(&|chunk,_|{
-			chunk.iter_pair_mut_parallel(&|a,b,dim|{
-				func(a,b,dim);
-			}, scope_creator);
+			if par_inner {
+				chunk.iter_pair_mut_parallel(&|a,b,dim|{
+					func(a,b,dim);
+				}, scope_creator);
+			}else {
+				chunk.iter_pair_mut(&|a,b,dim|{
+					func(a,b,dim);
+				});
+			}
 		}, scope_creator);
 		self.values.iter_pair_mut_parallel(&|chunka: &mut NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,chunkb,dim|{
 			let a_uw=chunka.unwrap_mut();

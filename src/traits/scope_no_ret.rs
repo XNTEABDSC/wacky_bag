@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, thread::{self, ScopedJoinHandle}};
+use std::thread::{self};
 
 pub trait ThreadScope<'scope>{
     fn spawn<F>(&self, f: F) ->()
