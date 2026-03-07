@@ -7,6 +7,7 @@ pub mod dim_root_of_x_usize;
 pub mod output_func;
 pub mod type_fn;
 pub mod select_zip;
+pub mod h_list_helpers;
 //pub mod grid_iter_copy;
 
 use crate::collections::raw_vec::RawVec;
