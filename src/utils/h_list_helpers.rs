@@ -1,6 +1,6 @@
-use std::{iter::Chain, marker::PhantomData, ops::Deref};
+use std::{iter::Chain, marker::PhantomData, ops::{Deref, Neg}};
 
-use frunk::Func;
+use frunk::{Func, Poly, ToMut, ToRef, hlist::HMappable};
 
 use crate::utils::type_fn::{OneOneMappingFunc, OneOneMappingTypeFunc, TypeFunc};
 
@@ -129,3 +129,83 @@ impl<'a,T> Func<&'a mut T> for MapMutToRef {
 		i
 	}
 }
+
+pub struct MapNeg;
+impl<T> TypeFunc<T> for MapNeg 
+	where T:Neg
+{
+	type Output=T::Output;
+}
+impl<T,O> Func<T> for MapNeg 
+	where T:Neg<Output = O>
+{
+	type Output=O;
+
+	fn call(i: T) -> Self::Output {
+		-i
+	}
+}
+
+pub struct MapNegRev;
+
+impl<T1,T2> TypeFunc<T1> for MapNegRev
+	where T1:Neg<Output = T2>,
+		T2:Neg<Output = T1>
+{
+	type Output=T2;
+}
+impl<T1,T2> OneOneMappingTypeFunc<T2> for MapNegRev
+	where T1:Neg<Output = T2>,
+		T2:Neg<Output = T1>
+{
+	type Input=T1;
+}
+
+impl<T1,T2> Func<T1> for MapNegRev 
+	where T1:Neg<Output = T2>,
+		T2:Neg<Output = T1>
+{
+	type Output=T2;
+
+	fn call(i: T1) -> Self::Output {
+		-i
+	}
+}
+
+impl<T1,T2> OneOneMappingFunc<T2> for MapNegRev 
+	where T1:Neg<Output = T2>,
+		T2:Neg<Output = T1>
+{
+	type Input=T1;
+
+	fn inv_call(output:T2)->Self::Input {
+		-output
+	}
+}
+
+
+#[derive(Debug,Default,Clone, Copy)]
+pub struct MapRef<'a>(pub PhantomData<&'a ()>);
+
+impl<'a,T:'a> TypeFunc<T> for MapRef<'a> {
+	type Output=&'a T;
+}
+impl<'a,T:'a> OneOneMappingTypeFunc<&'a T> for MapRef<'a> {
+	type Input=T;
+}
+
+#[derive(Debug,Default,Clone, Copy)]
+pub struct MapMut<'a>(pub PhantomData<&'a ()>);
+
+impl<'a,T:'a> TypeFunc<T> for MapMut<'a> {
+	type Output=&'a mut T;
+}
+impl<'a,T:'a> OneOneMappingTypeFunc<&'a mut T> for MapMut<'a> {
+	type Input=T;
+}
+
+pub type HMap<HList,Mapper>=<HList as HMappable<Mapper>>::Output;
+
+pub type HMapP<HList,Mapper>=<HList as HMappable<Poly<Mapper>>>::Output;
+pub type HToRef<'a,T>=<T as ToRef<'a>>::Output;
+pub type HToMut<'a,T>=<T as ToMut<'a>>::Output;

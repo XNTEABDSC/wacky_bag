@@ -6,9 +6,15 @@ use std::{
 
 use crate::{
     structures::n_dim_array::{
+        dim_dir::DimDir,
         n_dim_index::NDimIndex,
         n_dim_index_operator::NDimIndexOperator,
-		t_n_dim_array::{NDimArrayGetWithNeiborhoodsResult, TNDimArray, TNDimArrayGetWithNeiborhoods, TNDimArrayIterPair, TNDimArrayParallelIterPair}, t_n_dim_indexer::TNDimIndexer
+        t_n_dim_array::{
+            NDimArrayGetWithNeiborhoodsResult, TNDimArray, TNDimArrayForEach,
+            TNDimArrayForEachEdge, TNDimArrayForEachEdgeParallel, TNDimArrayForEachParallel,
+            TNDimArrayGetWithNeiborhoods, TNDimArrayIterPair, TNDimArrayIterPairParallel,
+        },
+        t_n_dim_indexer::TNDimIndexer,
     },
     traits::scope_no_ret::{self, ThreadScopeCreator, ThreadScopeUser},
 };
@@ -28,7 +34,7 @@ where
 //     TIndexer: Deref<Target: TNDimIndexer<DIM>>,
 //     Storage: Index<usize, Output = T> + IndexMut<usize>,
 // {
-    
+
 // }
 
 impl<TIndexer, const DIM: usize, T> NDimArray<TIndexer, DIM, T, Vec<T>>
@@ -128,10 +134,17 @@ where
                 .index_mut(self.n_dim_index.compress_index(indexes)),
         )
     }
+}
 
-    fn for_each<'env, Func>(&'env self, func: &Func)
+impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayForEach<DIM, T>
+    for NDimArray<TIndexer, DIM, T, Storage>
+where
+    TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+    Storage: Index<usize, Output = T> + IndexMut<usize>,
+{
+    fn for_each<'env, Func>(&'env self, func: &mut Func)
     where
-        Func: Fn(&'env T, NDimIndex<DIM>),
+        Func: FnMut(&'env T, NDimIndex<DIM>),
     {
         let array: &Self = self;
         for index in array.n_dim_index.iter().enumerate() {
@@ -141,6 +154,25 @@ where
         }
     }
 
+    fn for_each_mut<'env, Func>(&'env mut self, func: &mut Func)
+    where
+        Func: FnMut(&'env mut T, NDimIndex<DIM>),
+        T: 'env,
+    {
+        let array = self;
+        for index in array.n_dim_index.iter().enumerate() {
+            let item = unsafe { transmute(array.values.index_mut(index.0)) };
+            func(item, index.1);
+        }
+    }
+}
+
+impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayForEachParallel<DIM, T>
+    for NDimArray<TIndexer, DIM, T, Storage>
+where
+    TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+    Storage: Index<usize, Output = T> + IndexMut<usize>,
+{
     fn for_each_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env self,
         func: &Func,
@@ -174,7 +206,7 @@ where
                 let func = self.func;
                 let array = self.array;
 
-                array.for_each(&|t, i| {
+                array.for_each(&mut |t, i| {
                     scope.spawn(move || {
                         (func)(t, i);
                     });
@@ -185,18 +217,6 @@ where
             array: self,
             func: &func,
         });
-    }
-
-    fn for_each_mut<'env, Func>(&'env mut self, func: &Func)
-    where
-        Func: Fn(&'env mut T, NDimIndex<DIM>),
-        T: 'env,
-    {
-        let array = self;
-        for index in array.n_dim_index.iter().enumerate() {
-            let item = unsafe { transmute(array.values.index_mut(index.0)) };
-            func(item, index.1);
-        }
     }
 
     fn for_each_mut_parallel<'ext_env, Func, TScopeCreator>(
@@ -232,7 +252,7 @@ where
                 let func = self.func;
                 let array = self.array;
 
-                array.for_each_mut(&|t, i| {
+                array.for_each_mut(&mut |t, i| {
                     scope.spawn(move || {
                         (func)(t, i);
                     });
@@ -244,53 +264,6 @@ where
             func: func,
         });
     }
-
-    // fn for_each_parallel<'ext_env, Func, TScopeCreator>(
-    //     &'ext_env self,
-    //     func: &Func,
-    //     scope_creator: &TScopeCreator,
-    // ) where
-    //     Func: for<'scope> Fn(&'scope T, &'scope NDimIndex<DIM>) + 'ext_env + Sync + Send,
-    //     TScopeCreator: ThreadScopeCreator + Sync,
-    //     T: Send + Sync,
-    // {
-    //     struct A<'env, Func, TIndexer, const DIM: usize, T, Storage>
-    //     where
-    //         TIndexer: Deref<Target: TNDimIndexer<DIM>>,
-    //         Storage: Index<usize, Output = T> + IndexMut<usize>,
-    //     {
-    //         array: &'env NDimArray<TIndexer, DIM, T, Storage>,
-    //         func: &'env Func,
-    //     }
-    //     impl<'env, Func, TIndexer, const DIM: usize, T, Storage> ThreadScopeUser<'env>
-    //         for A<'env, Func, TIndexer, DIM, T, Storage>
-    //     where
-    //         TIndexer: Deref<Target: TNDimIndexer<DIM>>,
-    //         Storage: Index<usize, Output = T> + IndexMut<usize>,
-    //         Func: for<'scope> Fn(&'scope T, &'scope NDimIndex<DIM>) + 'env + Sync + Send,
-    //         T: Send + Sync,
-    //     {
-    //         fn use_scope<'scope, TScope>(self, scope: &'scope TScope) -> ()
-    //         where
-    //             TScope: 'scope + scope_no_ret::ThreadScope<'scope>,
-    //             'env: 'scope,
-    //         {
-    //             let array = self.array;
-    //             let func = self.func;
-    //             for index in array.n_dim_index.iter().enumerate() {
-    //                 if let Some(item) = array.get_with_compressed(index.0) {
-    //                     scope.spawn(move || {
-    //                         (func)(item, &index.1);
-    //                     });
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     scope_creator.scope(A {
-    //         array: self,
-    //         func: &func,
-    //     });
-    // }
 }
 
 impl<'a, TIndexer, const DIM: usize, T, Storage> TNDimArrayGetWithNeiborhoods<'a, DIM, T>
@@ -380,77 +353,68 @@ where
     type TIndexer = &'a <TIndexer as Deref>::Target;
 }
 
-impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayIterPair<DIM,T>
-	for NDimArray<TIndexer, DIM, T, Storage> 
-where 
-	TIndexer: Deref<Target: TNDimIndexer<DIM>>,
-	Storage: Index<usize, Output = T> + IndexMut<usize>,
+impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayIterPair<DIM, T>
+    for NDimArray<TIndexer, DIM, T, Storage>
+where
+    TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+    Storage: Index<usize, Output = T> + IndexMut<usize>,
 {
-	fn iter_pair<'ext_env, Func>(
-        &'ext_env self,
-        func: &Func,
-    ) where
-        Func: for<'scope> Fn(&'scope T, &'scope T, usize) + 'ext_env,
+    fn iter_pair<'ext_env, Func>(&'ext_env self, func: &mut Func)
+    where
+        Func: FnMut(&'ext_env T, &'ext_env T, usize),
     {
         for mut_dim in 0..DIM {
-			let af=|plus_1|{
-				let rem = if plus_1 { 0 } else { 1 };
-				let values = self;
-				let n_dim_index: &TIndexer = unsafe { transmute(&values.n_dim_index) };
-				for p in n_dim_index.iter() {
-					if p[mut_dim] % 2 == rem {
-						continue;
-					}
-					let mut p2 = p.clone();
-					p2[mut_dim] += 1;
-					if let Some(v1) = unsafe { values.get_other(&p) } {
-						if let Some(v2) = unsafe { values.get_other(&p2) } {
-							(func)(v1, v2, mut_dim);
-						}
-					}
-				}
-			};
-			af(false);
-			af(true);
+            let mut af = |plus_1| {
+                let rem = if plus_1 { 0 } else { 1 };
+                let values = self;
+                let n_dim_index: &TIndexer = unsafe { transmute(&values.n_dim_index) };
+                for p in n_dim_index.iter() {
+                    if p[mut_dim] % 2 == rem {
+                        continue;
+                    }
+                    let mut p2 = p.clone();
+                    p2[mut_dim] += 1;
+                    if let Some(v1) = unsafe { values.get_other(&p) } {
+                        if let Some(v2) = unsafe { values.get_other(&p2) } {
+                            (func)(v1, v2, mut_dim);
+                        }
+                    }
+                }
+            };
+            af(false);
+            af(true);
         }
     }
-    fn iter_pair_mut<'ext_env, Func>(
-        &'ext_env mut self,
-        func: &Func,
-    ) where
-        Func: for<'scope> Fn(&'scope mut T, &'scope mut T, usize) + 'ext_env,
+    fn iter_pair_mut<'ext_env, Func>(&'ext_env mut self, func: &mut Func)
+    where
+        Func: FnMut(&'ext_env mut T, &'ext_env mut T, usize),
     {
         for mut_dim in 0..DIM {
-			let mut af=|plus_1|{
-				let rem = if plus_1 { 0 } else { 1 };
-				let n_dim_index: &TIndexer = unsafe { transmute(&self.n_dim_index) };
-				let mut_dim = mut_dim;
-				for p in n_dim_index.iter() {
-					if p[mut_dim] % 2 == rem {
-						continue;
-					}
-					let mut p2 = p.clone();
-					p2[mut_dim] += 1;
-					if let Some(v1) = unsafe { self.get_mut_other(&p) } {
-						if let Some(v2) = unsafe { self.get_mut_other(&p2) } {
-							(func)(v1, v2, mut_dim);
-						}
-					}
-				}
-			};
-            
-            af(
-                false,
-            );
-            af(
-                true,
-            );
-        }
-    }
+            let mut af = |plus_1| {
+                let rem = if plus_1 { 0 } else { 1 };
+                let n_dim_index: &TIndexer = unsafe { transmute(&self.n_dim_index) };
+                let mut_dim = mut_dim;
+                for p in n_dim_index.iter() {
+                    if p[mut_dim] % 2 == rem {
+                        continue;
+                    }
+                    let mut p2 = p.clone();
+                    p2[mut_dim] += 1;
+                    if let Some(v1) = unsafe { self.get_mut_other(&p) } {
+                        if let Some(v2) = unsafe { self.get_mut_other(&p2) } {
+                            (func)(v1, v2, mut_dim);
+                        }
+                    }
+                }
+            };
 
+            af(false);
+            af(true);
+        }
+    }
 }
 
-impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayParallelIterPair<DIM, T>
+impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayIterPairParallel<DIM, T>
     for NDimArray<TIndexer, DIM, T, Storage>
 where
     TIndexer: Deref<Target: TNDimIndexer<DIM>>,
@@ -552,7 +516,7 @@ where
                 Func: for<'scope> Fn(&'scope mut T, &'scope mut T, usize) + 'env + Sync + Send,
                 T: Send + Sync,
             {
-                fn use_scope<'scope, TScope>(self, scope:TScope) -> ()
+                fn use_scope<'scope, TScope>(self, scope: TScope) -> ()
                 where
                     TScope: scope_no_ret::ThreadScope<'scope>,
                     'env: 'scope,
@@ -594,6 +558,144 @@ where
     }
 }
 
+impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayForEachEdge<DIM, T>
+    for NDimArray<TIndexer, DIM, T, Storage>
+where
+    TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+    Storage: Index<usize, Output = T> + IndexMut<usize>,
+{
+    fn for_each_edge<'ext_env, Func>(&'ext_env self, dim_dir: super::dim_dir::DimDir, func: &mut Func)
+    where
+        Func: FnMut(&'ext_env T, NDimIndex<DIM>),
+        T: Send + Sync,
+    {
+        let edge_iter = self.n_dim_index.edge_iter(dim_dir);
+        for (i, u) in edge_iter {
+            func(&self.values[u], i);
+        }
+    }
+
+    fn for_each_edge_mut<'ext_env, Func>(
+        &'ext_env mut self,
+        dim_dir: super::dim_dir::DimDir,
+        func: &mut Func,
+    ) where
+        Func: FnMut(&'ext_env mut T, NDimIndex<DIM>),
+        T: Send + Sync,
+    {
+        let edge_iter = self.n_dim_index.edge_iter(dim_dir);
+        for (i, u) in edge_iter {
+            let item = unsafe { transmute(&mut self.values[u]) };
+            func(item, i);
+        }
+    }
+}
+
+impl<TIndexer, const DIM: usize, T, Storage> TNDimArrayForEachEdgeParallel<DIM, T>
+    for NDimArray<TIndexer, DIM, T, Storage>
+where
+    TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+    Storage: Index<usize, Output = T> + IndexMut<usize>,
+{
+    fn for_each_edge_parallel<'ext_env, Func, TScopeCreator>(
+        &'ext_env self,
+        dim_dir: super::dim_dir::DimDir,
+        func: &Func,
+        scope_creator: &TScopeCreator,
+    ) where
+        Func: for<'scope> Fn(&'scope T, NDimIndex<DIM>) + 'ext_env + Sync + Send,
+        TScopeCreator: ThreadScopeCreator + Sync,
+        T: Send + Sync,
+    {
+        struct A<'env, Func, TIndexer, const DIM: usize, T, Storage>
+        where
+            TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+            Storage: Index<usize, Output = T> + IndexMut<usize>,
+        {
+            array: &'env NDimArray<TIndexer, DIM, T, Storage>,
+            func: &'env Func,
+            dim_dir: DimDir,
+        }
+        impl<'env, Func, TIndexer, const DIM: usize, T, Storage> ThreadScopeUser<'env>
+            for A<'env, Func, TIndexer, DIM, T, Storage>
+        where
+            TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+            Storage: Index<usize, Output = T> + IndexMut<usize>,
+            Func: for<'scope> Fn(&'scope T, NDimIndex<DIM>) + 'env + Sync + Send,
+            T: Send + Sync,
+        {
+            fn use_scope<'scope, TScope>(self, scope: TScope) -> ()
+            where
+                TScope: scope_no_ret::ThreadScope<'scope>,
+                'env: 'scope,
+            {
+                let func = self.func;
+                let array = self.array;
+                let dim_dir = self.dim_dir;
+                array.for_each_edge(dim_dir, &mut |t, i| {
+                    scope.spawn(move || {
+                        (func)(t,i);
+                    });
+                });
+            }
+        }
+        scope_creator.scope(A {
+            array: self,
+            func: &func,
+            dim_dir,
+        });
+    }
+
+    fn for_each_edge_mut_parallel<'ext_env, Func, TScopeCreator>(
+        &'ext_env mut self,
+        dim_dir: super::dim_dir::DimDir,
+        func: &Func,
+        scope_creator: &TScopeCreator,
+    ) where
+        Func: for<'scope> Fn(&'scope mut T, NDimIndex<DIM>) + 'ext_env + Sync + Send,
+        TScopeCreator: ThreadScopeCreator + Sync,
+        T: Send + Sync,
+    {
+        struct A<'env, Func, TIndexer, const DIM: usize, T, Storage>
+        where
+            TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+            Storage: Index<usize, Output = T> + IndexMut<usize>,
+        {
+            array: &'env mut NDimArray<TIndexer, DIM, T, Storage>,
+            func: &'env Func,
+            dim_dir: DimDir,
+        }
+        impl<'env, Func, TIndexer, const DIM: usize, T, Storage> ThreadScopeUser<'env>
+            for A<'env, Func, TIndexer, DIM, T, Storage>
+        where
+            TIndexer: Deref<Target: TNDimIndexer<DIM>>,
+            Storage: Index<usize, Output = T> + IndexMut<usize>,
+            Func: for<'scope> Fn(&'scope mut T, NDimIndex<DIM>) + 'env + Sync + Send,
+            T: Send + Sync,
+        {
+            fn use_scope<'scope, TScope>(self, scope: TScope) -> ()
+            where
+                TScope: scope_no_ret::ThreadScope<'scope>,
+                'env: 'scope,
+            {
+                let func = self.func;
+                let array = self.array;
+                let dim_dir = self.dim_dir;
+                array.for_each_edge_mut(dim_dir, &mut |t, i| {
+                    scope.spawn(move || {
+                        (func)(t, i);
+                    });
+                });
+            }
+        }
+        scope_creator.scope(A {
+            array: self,
+            func: &func,
+            dim_dir,
+        });
+    }
+}
+
 // #[derive(Debug)]
 // pub struct NDimArrayGetMutWithNeiborhoodsResult<'a,const DIM:usize,T>{
 //     pub cur:&'a mut T,
@@ -611,7 +713,10 @@ mod test {
     // use core::time;
     // use std::thread;
 
-    use crate::{structures::n_dim_array::n_dim_indexer::NDimIndexer, traits::scope_no_ret::ThreadScopeCreatorStd};
+    use crate::{
+        structures::n_dim_array::n_dim_indexer::NDimIndexer,
+        traits::scope_no_ret::ThreadScopeCreatorStd,
+    };
 
     // use crate::structures::{n_dim_array::{NDimArray}, n_dim_index::NDimIndexer};
     use super::*;

@@ -8,6 +8,8 @@ pub mod output_func;
 pub mod type_fn;
 pub mod select_zip;
 pub mod h_list_helpers;
+pub mod impl_phantom;
+pub mod default_of;
 //pub mod grid_iter_copy;
 
 use crate::collections::raw_vec::RawVec;

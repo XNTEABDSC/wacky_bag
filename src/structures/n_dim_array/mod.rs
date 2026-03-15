@@ -9,3 +9,6 @@ pub mod t_n_dim_array;
 pub mod t_n_dim_indexer;
 pub mod n_dim_indexer;
 pub mod n_dim_indexer_u;
+pub mod dim_dir;
+pub mod n_dim_index_iterator;
+pub mod n_dim_index_edge_iterator;

@@ -13,7 +13,7 @@ pub struct NDimIndexOperator<const DIM:usize,TIndexer>{
 impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 	where TIndexer: Deref<Target : TNDimIndexer<DIM>>
 {
-	pub unsafe fn new(indexer:TIndexer,index:NDimIndex<DIM>,compressed:usize)->Self{
+	pub unsafe fn from_raw(indexer:TIndexer,index:NDimIndex<DIM>,compressed:usize)->Self{
 		NDimIndexOperator{
 			index,indexer,compressed
 		}
@@ -47,6 +47,10 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 		self.compressed
 	}
 
+	pub fn get_indexer(&self)->&TIndexer{
+		&self.indexer
+	}
+
 	pub fn move_n_carry(&mut self,n:isize)->isize{
 		self.move_n_carry_at_dim(DIM-1, n)
 	}
@@ -64,10 +68,9 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 			}
 		});
 		let mut compressed=self.compressed as isize + n*step_at_dim as isize;
-		// self.compressed = (self.compressed as isize + n*step_at_dim as isize) as usize;
 		let c2=loop_wrap_assign(&mut compressed, & (0..*self.indexer.length() as isize), *self.indexer.length() as isize);
 		self.compressed=compressed as usize;
-		debug_assert_eq!(c2,match res {
+		assert_eq!(c2,match res {
 			ControlFlow::Continue(c)=>c,
 			ControlFlow::Break(_)=>0
 		});
@@ -89,7 +92,7 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 	pub fn set_n_at_dim(&mut self,dim_idx:usize,n:isize){
 		// self.move_n_at_dim(dim_idx, n-(self.index[dim_idx] as isize))
 		let range=&self.indexer.lens()[dim_idx];
-		debug_assert!(range.contains(&n));
+		assert!(range.contains(&n));
 		let index_at_dim=self.index[dim_idx];
 		let step_at_dim=self.indexer.steps()[dim_idx];
 		let index_delta=n-index_at_dim;
