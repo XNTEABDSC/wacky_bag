@@ -1,6 +1,6 @@
 use std::{array, ops::{Range, RangeInclusive}};
 
-use crate::{structures::{doubly_slice_layers::{DoublySliceIndex, doubly_slice_layers_overlap, find_range_at_doubly_slice_i}, just::Just, n_dim_array::{n_dim_array::NDimArray, n_dim_indexer::NDimIndexer, t_n_dim_array::TNDimArray}}, utils::range_inclusive_upper_convert::range_inclusive_convert_cover};
+use crate::{structures::{doubly_slice_layers::{DoublySliceIndex, doubly_slice_layers_overlap, find_range_at_doubly_slice_i}, just::Owned, n_dim_array::{n_dim_array::NDimArray, n_dim_indexer::NDimIndexer, t_n_dim_array::TNDimArray}}, utils::range_inclusive_upper_convert::range_inclusive_convert_cover};
 pub struct DoublyGridIndex<const DIM:usize>{
     pub layer:isize,pub pos:[isize;DIM]
 }
@@ -8,7 +8,7 @@ pub type DoublyGrid2DIndex=DoublyGridIndex<2>;
 
 pub struct DoublyGridLayers<const DIM:usize,T>{
     //indexers:Vec<NDimIndexer<DIM>>,
-    pub values:Vec<NDimArray<Just<NDimIndexer<DIM>>,DIM,T,Vec<T>>>,
+    pub values:Vec<NDimArray<Owned<NDimIndexer<DIM>>,DIM,T,Vec<T>>>,
 
 }
 
@@ -28,7 +28,7 @@ impl<T,const DIM:usize> DoublyGridLayers<DIM,T> {
             }));
             //res.indexers.push(indexer);
 
-            let layer_values=NDimArray::from_fn(Just(indexer), |index|genfn(DoublyGridIndex { layer: layer_index, pos: index }));
+            let layer_values=NDimArray::from_fn(Owned(indexer), |index|genfn(DoublyGridIndex { layer: layer_index, pos: index }));
             
             res.values.push(layer_values);
             

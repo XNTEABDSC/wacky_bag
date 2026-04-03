@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::structures::{
-    just::Just,
+    just::Owned,
     n_dim_array::{
         n_dim_array::NDimArray,
         n_dim_index::NDimIndex,
@@ -19,10 +19,10 @@ use crate::structures::{
 
 pub struct NDimChunkArray<const DIM: usize, T> {
     values: NDimArray<
-        Just<NDimIndexerU<DIM>>,
+        Owned<NDimIndexerU<DIM>>,
         DIM,
-        NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,
-        Vec<NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>>,
+        NDimArray<Owned<NDimIndexerU<DIM>>, DIM, T, Vec<T>>,
+        Vec<NDimArray<Owned<NDimIndexerU<DIM>>, DIM, T, Vec<T>>>,
     >,
     lens: [usize; DIM],
     dim_elem_count: usize,
@@ -66,7 +66,7 @@ impl<const DIM: usize, T> NDimChunkArray<DIM, T> {
         });
         let chunks_lens = lens_split_data.map(|(div, rem)| if rem > 0 { div + 1 } else { div });
         let chunks_n_dim_indexer = NDimIndexerU::new_len(chunks_lens);
-        let values = NDimArray::from_fn(Just(chunks_n_dim_indexer), |t_idx| {
+        let values = NDimArray::from_fn(Owned(chunks_n_dim_indexer), |t_idx| {
             let chunk_index: [usize; DIM] = array::from_fn(|i| {
                 if (t_idx[i] as usize) == lens_split_data[i].0 {
                     lens_split_data[i].1
@@ -75,7 +75,7 @@ impl<const DIM: usize, T> NDimChunkArray<DIM, T> {
                 }
             });
             let chunk_n_dim_indexer = NDimIndexerU::new_len(chunk_index);
-            let chunk_values = NDimArray::from_fn(Just(chunk_n_dim_indexer), |c_idx| {
+            let chunk_values = NDimArray::from_fn(Owned(chunk_n_dim_indexer), |c_idx| {
                 let full_index =
                     array::from_fn(|i| t_idx[i] * (dim_elem_count as isize) + c_idx[i]);
                 func(&full_index)
@@ -99,7 +99,7 @@ impl<const DIM: usize, T> NDimChunkArray<DIM, T> {
 
 impl<const DIM: usize, T> TNDimArray<DIM, T> for NDimChunkArray<DIM, T> {
     fn lens(&self) -> impl Deref<Target = [std::ops::Range<isize>; DIM]> {
-        Just(self.lens.map(|l| 0isize..(l as isize)))
+        Owned(self.lens.map(|l| 0isize..(l as isize)))
     }
 
     fn get(&self, indexes: &super::n_dim_index::NDimIndex<DIM>) -> Option<&T> {
@@ -365,7 +365,7 @@ impl<const DIM: usize, T> TNDimArrayIterPair<DIM, T> for NDimChunkArray<DIM, T> 
             });
         });
         self.values.iter_pair_mut(&mut |chunka: &mut NDimArray<
-            Just<NDimIndexerU<DIM>>,
+            Owned<NDimIndexerU<DIM>>,
             DIM,
             T,
             Vec<T>,
@@ -460,7 +460,7 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
             scope_creator,
         );
         self.values.iter_pair_parallel(
-            &|chunka: &NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>, chunkb, dim| {
+            &|chunka: &NDimArray<Owned<NDimIndexerU<DIM>>, DIM, T, Vec<T>>, chunkb, dim| {
                 let a_uw = chunka.unwrap_ref();
                 let b_uw = chunkb.unwrap_ref();
                 let a_end_i = a_uw.0.lens()[dim] as isize - 1;
@@ -547,7 +547,7 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
             scope_creator,
         );
         self.values.iter_pair_mut_parallel(
-            &|chunka: &mut NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>, chunkb, dim| {
+            &|chunka: &mut NDimArray<Owned<NDimIndexerU<DIM>>, DIM, T, Vec<T>>, chunkb, dim| {
                 let a_uw = chunka.unwrap_mut();
                 let b_uw = chunkb.unwrap_mut();
                 let a_end_i = a_uw.0.lens()[dim] as isize - 1;
@@ -612,7 +612,7 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
 pub struct NDimChunkArrayIter<'a, const DIM: usize, T> {
     // chunk_array:&'a NDimChunkArray<DIM,T>,
     chunk_iter:
-        <&'a Vec<NDimArray<Just<NDimIndexerU<DIM>>, DIM, T, Vec<T>>> as IntoIterator>::IntoIter,
+        <&'a Vec<NDimArray<Owned<NDimIndexerU<DIM>>, DIM, T, Vec<T>>> as IntoIterator>::IntoIter,
     item_iter: Option<<&'a Vec<T> as IntoIterator>::IntoIter>,
     // current_index:NDimIndex<DIM>,
     // ended:bool,

@@ -2,9 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 
 #[derive(Debug, Clone, Copy)]
-pub struct Just<T>(pub T);
+pub struct Owned<T>(pub T);
 
-impl<T> Deref for Just<T> {
+impl<T> Deref for Owned<T> {
     type Target=T;
 
     fn deref(&self) -> &Self::Target {
@@ -12,14 +12,14 @@ impl<T> Deref for Just<T> {
     }
 }
 
-impl<T> DerefMut for Just<T> {
+impl<T> DerefMut for Owned<T> {
 
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T> From<T> for Just<T> {
+impl<T> From<T> for Owned<T> {
     fn from(value: T) -> Self {
         Self(value)
     }

@@ -1,6 +1,6 @@
 use std::{array, ops::{ControlFlow, Deref}};
 
-use crate::structures::{just::Just, n_dim_array::{n_dim_index_u::NDimIndexU, t_n_dim_indexer::TNDimIndexer}};
+use crate::structures::{just::Owned, n_dim_array::{n_dim_index_u::NDimIndexU, t_n_dim_indexer::TNDimIndexer}};
 
 
 
@@ -52,7 +52,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexerU<DIM> {
 	}
 
 	fn lens(&self)->impl Deref<Target = [std::ops::Range<isize>; DIM]> {
-		Just(self.lens.map(|l|0isize..(l as isize)))
+		Owned(self.lens.map(|l|0isize..(l as isize)))
 	}
 	
 	fn steps(&self)->&[usize;DIM] {

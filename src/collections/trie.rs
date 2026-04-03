@@ -59,7 +59,8 @@ impl<Key,Value> Trie<Key,Value>
         }
     } */
 
-    pub fn insert(&mut self,mut index:impl Iterator<Item = Key>,value:Value)->Option<Value>{
+    pub fn insert(&mut self,index:impl IntoIterator<Item = Key>,value:Value)->Option<Value>{
+		let mut index=index.into_iter();
         let key_=index.next();
         if let Some(key)=key_{
             let next_=self.nexts.get_mut(&key);
@@ -107,9 +108,9 @@ impl<Key,Value> Trie<Key,Value>
         return  self.value.is_none()&&self.nexts.len()==0;
     }
 
-
-    pub fn match_get<Iter:Iterator<Item = Key>>(&self,mut index:Iter)->(Option<&Value>,Chain< <Vec<Key> as IntoIterator >::IntoIter , Iter>) {
-        let mut used=Vec::<Key>::new();
+    pub fn match_get<Iter:Iterator<Item = Key>>(&self,mut index:Iter)->(Option<&Value>,Vec<Key>,Chain< <Vec<Key> as IntoIterator >::IntoIter , Iter>) {
+        let mut unused=Vec::<Key>::new();
+		let mut used=Vec::<Key>::new();
         let mut current: &Trie<Key, Value>=self;
         let mut selected:&Trie<Key, Value>=self;
 
@@ -117,11 +118,11 @@ impl<Key,Value> Trie<Key,Value>
             let next_key_=index.next();
             if let Some(next_key)=next_key_{
                 let next_=current.nexts.get(&next_key);
-                used.push(next_key);
+                unused.push(next_key);
                 if let Some(next)=next_{
                     if next.value.is_some(){
                         selected=next;
-                        used.clear();
+						used.append(&mut unused);
                     }else {
                         
                     }
@@ -133,7 +134,7 @@ impl<Key,Value> Trie<Key,Value>
                 break;
             }
         }
-        return (selected.value.as_ref(),used.into_iter().chain(index));
+        return (selected.value.as_ref(),used,unused.into_iter().chain(index));
     }
 
     /*
@@ -188,7 +189,7 @@ impl<Key,Value,const N:usize> From<[( [Key;N],Value);N]> for Trie<Key,Value>
 
 impl<Key,Value,KeyIter> FromIterator<(KeyIter,Value)> for Trie<Key,Value> 
     where Key:Hash+Eq,
-    KeyIter:Iterator<Item = Key>
+    KeyIter:IntoIterator<Item = Key>
 {
     fn from_iter<T: IntoIterator<Item = (KeyIter,Value)>>(iter: T) -> Self {
         let mut v=Self::new();
@@ -219,7 +220,7 @@ mod test{
         let teststr=String::from("aaabb aabbb");
         let res=index_tree.match_get(teststr.chars());
         assert_eq!(res.0,Some(&3));
-        let res1_collect:Vec<char>=res.1.collect();
+        let res1_collect:Vec<char>=res.2.collect();
         assert_eq!(res1_collect,String::from(" aabbb").chars().collect::<Vec<char>>());
         
     }
