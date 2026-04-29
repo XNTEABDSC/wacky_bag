@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use frunk::Func;
 
 /// You can consider that this is a function about type
@@ -92,5 +94,51 @@ impl<F1,F2,V1,V2,V3> OneOneMappingFunc<V3> for ChainFunc<F1,F2>
 	
 	fn inv_call(output:V3)->Self::Input {
 		F1::inv_call(F2::inv_call(output))
+	}
+}
+
+pub struct FuncAsTypeFunc<F>(pub F);
+
+impl<T,I,O> TypeFunc<I> for FuncAsTypeFunc<T>
+	where T:Func<I,Output = O>
+{
+	type Output=O;
+}
+
+impl<T,I,O> OneOneMappingTypeFunc<O> for FuncAsTypeFunc<T>
+	where T:OneOneMappingFunc<O,Input = I>
+{
+	type Input=I;
+}
+
+pub struct TypeFnAsPhantomFn<F>(pub F);
+
+impl<T,I,O> Func<PhantomData<I>> for TypeFnAsPhantomFn<T>
+	where T:TypeFunc<I,Output = O>
+{
+	type Output=PhantomData<O>;
+
+	fn call(_: PhantomData<I>) -> Self::Output {
+		Default::default() 
+	}
+}
+
+impl<T,I,O> OneOneMappingFunc<PhantomData<O>> for TypeFnAsPhantomFn<T>
+	where T:OneOneMappingTypeFunc<O,Input = I>
+{
+	type Input=PhantomData<I>;
+
+	fn inv_call(_output:PhantomData<O>)->Self::Input {
+		Default::default() 
+	}
+}
+#[derive(Debug,Default,Clone, Copy)]
+pub struct MapPhantomUnwrap;
+
+impl<T> Func<PhantomData<T>> for MapPhantomUnwrap {
+	type Output=T;
+
+	fn call(_i: PhantomData<T>) -> Self::Output {
+		panic!("{:?} should not be called, but only used in type expression",MapPhantomUnwrap)
 	}
 }

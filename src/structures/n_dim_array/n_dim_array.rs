@@ -19,7 +19,7 @@ use crate::{
     traits::scope_no_ret::{self, ThreadScopeCreator, ThreadScopeUser},
 };
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct NDimArray<TIndexer, const DIM: usize, T, Storage>
 where
     TIndexer: Deref<Target: TNDimIndexer<DIM>>,

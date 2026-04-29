@@ -29,3 +29,5 @@ impl<Mapper,InputH,InputT,OutputH,OutputT> HMappableFrom<Poly<Mapper>> for HCons
 		HCons { head: Mapper::call(input.head), tail: HMappableFrom::output_map(input.tail, mapper) }
 	}
 }
+
+// pub type HMapFP<Output,Input,Mapper>=<Output as HMappableFrom<Mapper,Input = Input>>::Output;

@@ -11,6 +11,9 @@ pub mod h_list_helpers;
 pub mod impl_phantom;
 pub mod default_of;
 pub mod num_extend;
+pub mod mul_as_add;
+pub mod h_extend_by_fn;
+// pub mod h_type_mappable;
 //pub mod grid_iter_copy;
 
 use crate::collections::raw_vec::RawVec;

@@ -3,6 +3,7 @@ use std::{array, ops::{ControlFlow, Deref, Range}};
 use crate::structures::n_dim_array::n_dim_index::NDimIndex;
 
 
+#[derive(Debug,Clone,Copy)]
 pub struct NDimIndexIter<const DIM:usize,Lens> {
     lens:Lens,
     cur:[isize;DIM],

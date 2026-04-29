@@ -4,6 +4,7 @@ use crate::structures::n_dim_array::{n_dim_index::NDimIndex, t_n_dim_indexer::TN
 
 
 /// convert indexes with N dimensions in range and usize
+#[derive(Debug,Clone)]
 pub struct NDimIndexer<const DIM:usize>{
     starts:[isize;DIM],
     steps:[usize;DIM],

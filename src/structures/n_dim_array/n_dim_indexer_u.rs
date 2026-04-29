@@ -3,13 +3,14 @@ use std::{array, ops::{ControlFlow, Deref}};
 use crate::structures::{just::Owned, n_dim_array::{n_dim_index_u::NDimIndexU, t_n_dim_indexer::TNDimIndexer}};
 
 
-
+#[derive(Debug,Clone)]
 pub struct NDimIndexerU<const DIM:usize>{
     steps:[usize;DIM],
     length:usize,
     lens:[usize;DIM],
 }
 
+#[derive(Debug,Clone)]
 pub struct NDimIndexUIter<'a,const DIM:usize>{
     lens:&'a [usize;DIM],
     cur:[usize;DIM],

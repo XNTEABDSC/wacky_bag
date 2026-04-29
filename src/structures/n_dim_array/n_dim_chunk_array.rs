@@ -16,7 +16,7 @@ use crate::structures::{
         },
     },
 };
-
+#[derive(Debug, Clone)]
 pub struct NDimChunkArray<const DIM: usize, T> {
     values: NDimArray<
         Owned<NDimIndexerU<DIM>>,

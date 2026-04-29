@@ -1,9 +1,10 @@
 use std::{iter::Chain, marker::PhantomData, ops::{Deref, Neg}};
 
-use frunk::{Func, Poly, ToMut, ToRef, hlist::HMappable};
+use frunk::{Func, Poly, ToMut, ToRef, hlist::{HMappable, HZippable}};
 
 use crate::utils::type_fn::{OneOneMappingFunc, OneOneMappingTypeFunc, TypeFunc};
 
+/// `T` <-> `Phantom<T>`
 pub struct MapToPhantom;
 
 impl<T> TypeFunc<T> for MapToPhantom{
@@ -22,6 +23,7 @@ impl<T> Func<T> for MapToPhantom {
 	}
 }
 
+/// `(Acc,X)` -> `Chain<Acc,X>`
 pub struct FoldChainIter;
 
 impl<Acc,X,Item> Func<(Acc,X)> for FoldChainIter 
@@ -35,6 +37,7 @@ impl<Acc,X,Item> Func<(Acc,X)> for FoldChainIter
 	}
 }
 
+// `x` -> `x.deref()`
 pub struct MapDeref;
 
 impl<'a,TA,TB> TypeFunc<&'a TA> for MapDeref
@@ -53,6 +56,8 @@ impl<'a,TA,TB> Func<&'a TA> for MapDeref
 	}
 }
 
+
+// `ta:TA` -> `ta.deref():TB`, with TF: TA <-> TB specifying
 pub struct MapDerefT<TF>(PhantomData<TF>);
 
 impl<'a,TF,TA,TB> TypeFunc<&'a TA> for MapDerefT<TF> 
@@ -86,23 +91,19 @@ impl<'a,TF,TA,TB> Func<&'a TA> for MapDerefT<TF>
 		i.deref()
 	}
 }
+
+/// `&'a i` -> `i.clone()`
 #[derive(Debug,Default,Clone, Copy)]
-pub struct MapClone<'a>(pub PhantomData<&'a ()>);
+pub struct MapClone;
 
 
-impl<'a,T> TypeFunc<&'a T> for MapClone<'a>
+impl<'a,T> TypeFunc<&'a T> for MapClone
 	where T:Clone+'a
 {
 	type Output=T;
 }
 
-impl<'a,T> OneOneMappingTypeFunc<T> for MapClone<'a> 
-	where T:Clone+'a
-{
-	type Input=&'a T;
-}
-
-impl<'a,T> Func<&'a T> for MapClone<'a>
+impl<'a,T> Func<&'a T> for MapClone
 	where T:Clone+'a
 {
 	type Output=T;
@@ -112,6 +113,33 @@ impl<'a,T> Func<&'a T> for MapClone<'a>
 	}
 }
 
+/// `&'a T` <-> `T`
+/// `&'a i` -> `i.clone()`
+#[derive(Debug,Default,Clone, Copy)]
+pub struct MapClone2<'a>(pub PhantomData<&'a ()>);
+
+impl<'a,T> TypeFunc<&'a T> for MapClone2<'a>
+	where T:Clone+'a
+{
+	type Output=T;
+}
+
+impl<'a,T> OneOneMappingTypeFunc<T> for MapClone2<'a> 
+	where T:Clone+'a
+{
+	type Input=&'a T;
+}
+
+impl<'a,T> Func<&'a T> for MapClone2<'a>
+	where T:Clone+'a
+{
+	type Output=T;
+
+	fn call(i: &'a T) -> Self::Output {
+		i.clone()
+	}
+}
+/// `&mut i` -> `&i`
 pub struct MapMutToRef;
 
 impl<'a,T> TypeFunc<&'a mut T> for MapMutToRef {
@@ -129,7 +157,7 @@ impl<'a,T> Func<&'a mut T> for MapMutToRef {
 		i
 	}
 }
-
+/// `i` -> `-i`
 pub struct MapNeg;
 impl<T> TypeFunc<T> for MapNeg 
 	where T:Neg
@@ -146,6 +174,7 @@ impl<T,O> Func<T> for MapNeg
 	}
 }
 
+/// `a` -> `-b`, `b` -> `-a`
 pub struct MapNegRev;
 
 impl<T1,T2> TypeFunc<T1> for MapNegRev
@@ -183,7 +212,7 @@ impl<T1,T2> OneOneMappingFunc<T2> for MapNegRev
 	}
 }
 
-
+/// `T` -> `&'a T`
 #[derive(Debug,Default,Clone, Copy)]
 pub struct MapRef<'a>(pub PhantomData<&'a ()>);
 
@@ -194,6 +223,7 @@ impl<'a,T:'a> OneOneMappingTypeFunc<&'a T> for MapRef<'a> {
 	type Input=T;
 }
 
+/// `T` -> `&'a mut T`
 #[derive(Debug,Default,Clone, Copy)]
 pub struct MapMut<'a>(pub PhantomData<&'a ()>);
 
@@ -205,7 +235,7 @@ impl<'a,T:'a> OneOneMappingTypeFunc<&'a mut T> for MapMut<'a> {
 }
 
 pub type HMap<HList,Mapper>=<HList as HMappable<Mapper>>::Output;
-
 pub type HMapP<HList,Mapper>=<HList as HMappable<Poly<Mapper>>>::Output;
+pub type HZip<A,B>=<A as HZippable<B>>::Zipped;
 pub type HToRef<'a,T>=<T as ToRef<'a>>::Output;
 pub type HToMut<'a,T>=<T as ToMut<'a>>::Output;

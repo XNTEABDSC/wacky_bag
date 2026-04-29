@@ -3,7 +3,7 @@ use std::ops::{ControlFlow, Deref};
 use crate::{structures::n_dim_array::{n_dim_index::NDimIndex, t_n_dim_indexer::TNDimIndexer}, utils::loop_wrap::loop_wrap_assign};
 
 
-#[derive(Clone, Copy)]
+#[derive(Debug,Clone, Copy)]
 pub struct NDimIndexOperator<const DIM:usize,TIndexer>{
 	indexer:TIndexer,
 	index:NDimIndex<DIM>,

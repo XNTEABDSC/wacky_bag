@@ -2,6 +2,7 @@ use std::{array, ops::Deref};
 
 use crate::structures::n_dim_array::{dim_dir::DimDir, n_dim_index::NDimIndex, n_dim_index_operator::NDimIndexOperator, t_n_dim_indexer::TNDimIndexer};
 
+#[derive(Debug,Clone,Copy)]
 pub struct NDimIndexEdgeIterator<const DIM:usize, TIndexer>{
 	operator:NDimIndexOperator<DIM,TIndexer>,
 	dim_dir:DimDir,
