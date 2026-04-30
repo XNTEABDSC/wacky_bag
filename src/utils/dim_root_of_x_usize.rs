@@ -11,7 +11,7 @@ impl DimRootOfXUsize {
     }
 
     pub fn get(&mut self,x:usize,dim:usize)->(usize,usize) {
-        while self.values.len()<dim {
+        while self.values.len()<=dim {
             self.values.push(HashMap::new());
         }
         let map=self.values.get_mut(dim).unwrap();
@@ -67,5 +67,5 @@ static DIM_ROOT_OF_X_USIZE:LazyLock< Mutex<DimRootOfXUsize> > = LazyLock::new(||
 /// Returns (dim_root,dim_root^dim)
 pub fn get_dim_root_of_x_usize(x:usize,dim:usize)->(usize,usize) {
 	
-    DIM_ROOT_OF_X_USIZE.lock().unwrap().get(dim, x)
+    DIM_ROOT_OF_X_USIZE.lock().unwrap().get( x, dim)
 }

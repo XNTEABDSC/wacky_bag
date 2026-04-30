@@ -59,6 +59,10 @@ pub fn get_chunk_dim_elem_count<T,const DIM:usize>(chunk_size:usize)->(usize,usi
     let (dim_elem_count,chunk_elem_count)=get_dim_root_of_x_usize(chunk_count,DIM);
     return (dim_elem_count,chunk_elem_count);
 }
+#[test]
+fn test(){
+	let (dim_elem_count,chunk_elem_count)=get_dim_root_of_x_usize(16*1024/16,2);
+}
 
 pub fn get_chunk_n_dim_indexer_u<T,const DIM:usize>(chunk_size:usize)->&'static NDimIndexerU<DIM>{
     let dim_elem_count=get_chunk_dim_elem_count::<T,DIM>(chunk_size).0;
