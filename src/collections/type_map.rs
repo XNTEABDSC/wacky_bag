@@ -1,0 +1,99 @@
+use std::{any::{Any, TypeId}, collections::{HashMap, hash_map}, hash::{BuildHasher, RandomState}, marker::PhantomData, ops::{ControlFlow, Deref}};
+
+type AnyHashMap<S>=HashMap<TypeId,Box<dyn Any+Send+Sync>,S>;
+#[derive(Debug)]
+pub struct TypeMap<S = RandomState>(AnyHashMap<S>);
+
+impl Default for TypeMap<RandomState> {
+	fn default() -> Self {
+		Self(Default::default())
+	}
+}
+
+impl TypeMap<RandomState> {
+	#[inline]
+	pub fn new()->Self{Self::default()}
+}
+
+impl<S> TypeMap<S> {
+	#[inline]
+	pub unsafe fn from_hash_map_unchecked(hash_map:AnyHashMap<S>)->Self{
+		Self(hash_map)
+	}
+	#[inline]
+	pub fn from_hash_map(hash_map:AnyHashMap<S>)->Option<Self>{
+		if Self::check_any_hash_map(&hash_map) {
+			Some(Self(hash_map))
+		}else {
+			None
+		}
+	}
+	#[inline]
+	pub fn check_any_hash_map(hash_map:&AnyHashMap<S>)->bool{
+		hash_map.iter().try_for_each(|(k,v)|{if (v.deref()).type_id()==*k {ControlFlow::Continue(())} else {ControlFlow::Break(())}}).is_continue()
+	}
+}
+
+pub struct Entry<'a,V:'a>{
+	entry:hash_map::Entry<'a,TypeId,Box<dyn Any+Send+Sync>>,
+	_p:PhantomData<V>
+}
+
+impl<S:BuildHasher> TypeMap<S> {
+	#[inline]
+	pub const fn inner(&self)->&AnyHashMap<S>{&self.0}
+	#[inline]
+	pub const unsafe fn inner_mut(&mut self)->&mut AnyHashMap<S>{&mut self.0}
+	#[inline]
+	pub fn into_inner(self)->AnyHashMap<S> {
+		self.0
+	}
+	#[inline]
+	pub fn entry<'a,T:'static>(&'a mut self)->Entry<'a,T> {
+		Entry { entry: self.0.entry(TypeId::of::<T>()), _p: Default::default() }
+	}
+	#[inline]
+	pub fn get<T:'static>(&self)->Option<&T>{
+		self.0.get(&TypeId::of::<T>()).and_then(|v|v.downcast_ref::<T>())
+	}
+	#[inline]
+	pub fn get_mut<T:'static>(&mut self)->Option<&mut T>{
+		self.0.get_mut(&TypeId::of::<T>()).and_then(|v|v.downcast_mut::<T>())
+	}
+	#[inline]
+	pub fn insert<T:'static+Send+Sync>(&mut self,v:T)->Option<Box<T>>  {
+		self.0.insert(TypeId::of::<T>(), Box::new(v)).and_then(|v|v.downcast().ok())
+	}
+	#[inline]
+	pub fn remove<T:'static>(&mut self)->Option<Box<T>>{
+		self.0.remove(&TypeId::of::<T>()).and_then(|v|v.downcast().ok())
+	}
+
+}
+
+impl<'a,V:'static+Send+Sync> Entry<'a,V> {
+	#[inline]
+	pub fn or_insert_with<F:FnOnce()->V>(self,f:F)->&'a mut V{
+		self.entry.or_insert_with(|| Box::new(f())).downcast_mut().unwrap()
+	}
+	#[inline]
+	pub fn key(&self)->&TypeId{
+		self.entry.key()
+	}
+	#[inline]
+	pub fn and_modify<F:FnOnce(&mut V)>(self,f:F)->Self{
+		Self { entry: self.entry.and_modify(|v|{
+			f(v.downcast_mut().unwrap())
+		}), _p: Default::default() }
+	}
+	#[inline]
+	pub fn or_default(self)->&'a mut V
+		where V:Default
+	{
+		self.or_insert_with(||V::default())
+	}
+	#[inline]
+	pub fn or_insert(self,v:V)->&'a mut V{
+		self.or_insert_with(move ||v)
+	}
+}

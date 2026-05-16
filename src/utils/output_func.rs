@@ -1,12 +1,17 @@
 
 use frunk::{Func, HCons, HNil, Poly};
 
-use crate::utils::type_fn::OneOneMappingTypeFunc;
+use crate::utils::type_fn::BijectiveTypeFunc;
 
-// pub trait OneOneMappingFunc<Output> : Func<Self::Input,Output = Output> {
+// pub trait BijectiveFunc<Output> : Func<Self::Input,Output = Output> {
 // 	type Input;
 // }
 
+/// Similar to [frunk::hlist::HMappable], but infer input type via output type.
+/// 
+/// This is useful when you need to do someting after [frunk::hlist::HCons::sculpt]
+/// 
+/// requires `OutputMapper` to implement [BijectiveTypeFunc]
 pub trait HMappableFrom<OutputMapper> {
 	type Input;
 	fn output_map(input:Self::Input,mapper:OutputMapper)->Self;
@@ -21,7 +26,7 @@ impl<Mapper> HMappableFrom<Poly<Mapper>> for HNil {
 }
 
 impl<Mapper,InputH,InputT,OutputH,OutputT> HMappableFrom<Poly<Mapper>> for HCons<OutputH,OutputT>
-	where Mapper:OneOneMappingTypeFunc<OutputH,Input = InputH> + Func<InputH,Output=OutputH>,
+	where Mapper:BijectiveTypeFunc<OutputH,Input = InputH> + Func<InputH,Output=OutputH>,
 	OutputT:HMappableFrom<Poly<Mapper>,Input = InputT>
 {
 	type Input = HCons<InputH,InputT>;

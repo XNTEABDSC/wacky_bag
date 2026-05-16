@@ -1,8 +1,35 @@
-use std::{iter::Chain, marker::PhantomData, ops::{Deref, Neg}};
+use std::{iter::Chain, marker::PhantomData, ops::{Add, Deref, Neg}};
 
 use frunk::{Func, Poly, ToMut, ToRef, hlist::{HMappable, HZippable}};
 
-use crate::utils::type_fn::{OneOneMappingFunc, OneOneMappingTypeFunc, TypeFunc};
+use crate::utils::type_fn::{BijectiveFunc, BijectiveTypeFunc, ChainFunc, MapFromPhantomPanic, MapPhantomType, TypeFnAsPhantomFn, TypeFunc};
+
+
+
+/// `&'a T` <-> `T`
+/// `&'a i` -> `i.clone()`
+#[derive(Debug,Default,Clone, Copy)]
+pub struct MapClone2<'a>(pub PhantomData<&'a ()>);
+
+impl<'a,T> BijectiveTypeFunc<T> for MapClone2<'a> 
+	where T:Clone+'a
+{
+	type Input=&'a T;
+}
+
+impl<'a,T> TypeFunc<&'a T> for MapClone2<'a>  {
+	type Output=T;
+}
+
+impl<'a,T> Func<&'a T> for MapClone2<'a>
+	where T:Clone+'a
+{
+	type Output=T;
+
+	fn call(i: &'a T) -> Self::Output {
+		i.clone()
+	}
+}
 
 /// `T` <-> `Phantom<T>`
 pub struct MapToPhantom;
@@ -11,7 +38,7 @@ impl<T> TypeFunc<T> for MapToPhantom{
 	type Output=PhantomData<T>;
 }
 
-impl<T> OneOneMappingTypeFunc<PhantomData<T>> for MapToPhantom {
+impl<T> BijectiveTypeFunc<PhantomData<T>> for MapToPhantom {
 	type Input=T;
 }
 
@@ -22,6 +49,8 @@ impl<T> Func<T> for MapToPhantom {
 		PhantomData::default()
 	}
 }
+
+
 
 /// `(Acc,X)` -> `Chain<Acc,X>`
 pub struct FoldChainIter;
@@ -69,11 +98,11 @@ impl<'a,TF,TA,TB> TypeFunc<&'a TA> for MapDerefT<TF>
 	type Output=&'a TB;
 }
 
-impl<'a,TF,TA,TB> OneOneMappingTypeFunc<&'a TB> for MapDerefT<TF> 
+impl<'a,TF,TA,TB> BijectiveTypeFunc<&'a TB> for MapDerefT<TF> 
 	where 
 		TA:Deref<Target=TB>,
 		TB:'a,TA:'a,
-		TF:OneOneMappingTypeFunc<TB,Input = TA>
+		TF:BijectiveTypeFunc<TB,Input = TA>
 {
 	type Input =&'a TA;
 }
@@ -96,13 +125,6 @@ impl<'a,TF,TA,TB> Func<&'a TA> for MapDerefT<TF>
 #[derive(Debug,Default,Clone, Copy)]
 pub struct MapClone;
 
-
-impl<'a,T> TypeFunc<&'a T> for MapClone
-	where T:Clone+'a
-{
-	type Output=T;
-}
-
 impl<'a,T> Func<&'a T> for MapClone
 	where T:Clone+'a
 {
@@ -113,32 +135,6 @@ impl<'a,T> Func<&'a T> for MapClone
 	}
 }
 
-/// `&'a T` <-> `T`
-/// `&'a i` -> `i.clone()`
-#[derive(Debug,Default,Clone, Copy)]
-pub struct MapClone2<'a>(pub PhantomData<&'a ()>);
-
-impl<'a,T> TypeFunc<&'a T> for MapClone2<'a>
-	where T:Clone+'a
-{
-	type Output=T;
-}
-
-impl<'a,T> OneOneMappingTypeFunc<T> for MapClone2<'a> 
-	where T:Clone+'a
-{
-	type Input=&'a T;
-}
-
-impl<'a,T> Func<&'a T> for MapClone2<'a>
-	where T:Clone+'a
-{
-	type Output=T;
-
-	fn call(i: &'a T) -> Self::Output {
-		i.clone()
-	}
-}
 /// `&mut i` -> `&i`
 pub struct MapMutToRef;
 
@@ -146,7 +142,7 @@ impl<'a,T> TypeFunc<&'a mut T> for MapMutToRef {
 	type Output=&'a T;
 }
 
-impl<'a,T> OneOneMappingTypeFunc<&'a T> for MapMutToRef {
+impl<'a,T> BijectiveTypeFunc<&'a T> for MapMutToRef {
 	type Input=&'a mut T;
 }
 
@@ -157,6 +153,7 @@ impl<'a,T> Func<&'a mut T> for MapMutToRef {
 		i
 	}
 }
+
 /// `i` -> `-i`
 pub struct MapNeg;
 impl<T> TypeFunc<T> for MapNeg 
@@ -183,7 +180,7 @@ impl<T1,T2> TypeFunc<T1> for MapNegRev
 {
 	type Output=T2;
 }
-impl<T1,T2> OneOneMappingTypeFunc<T2> for MapNegRev
+impl<T1,T2> BijectiveTypeFunc<T2> for MapNegRev
 	where T1:Neg<Output = T2>,
 		T2:Neg<Output = T1>
 {
@@ -201,7 +198,7 @@ impl<T1,T2> Func<T1> for MapNegRev
 	}
 }
 
-impl<T1,T2> OneOneMappingFunc<T2> for MapNegRev 
+impl<T1,T2> BijectiveFunc<T2> for MapNegRev 
 	where T1:Neg<Output = T2>,
 		T2:Neg<Output = T1>
 {
@@ -212,30 +209,75 @@ impl<T1,T2> OneOneMappingFunc<T2> for MapNegRev
 	}
 }
 
-/// `T` -> `&'a T`
+/// [TypeFunc] `T` <-> `&'a T`
 #[derive(Debug,Default,Clone, Copy)]
 pub struct MapRef<'a>(pub PhantomData<&'a ()>);
 
 impl<'a,T:'a> TypeFunc<T> for MapRef<'a> {
 	type Output=&'a T;
 }
-impl<'a,T:'a> OneOneMappingTypeFunc<&'a T> for MapRef<'a> {
+impl<'a,T:'a> BijectiveTypeFunc<&'a T> for MapRef<'a> {
 	type Input=T;
 }
 
-/// `T` -> `&'a mut T`
+/// [TypeFunc] `&T` -> `T`
+#[derive(Debug,Default,Clone, Copy)]
+pub struct MapFromRef;
+impl<'a,T> TypeFunc<&'a T> for MapFromRef {
+	type Output=T;
+}
+
+/// [TypeFunc] `T` -> `&'a mut T`
 #[derive(Debug,Default,Clone, Copy)]
 pub struct MapMut<'a>(pub PhantomData<&'a ()>);
 
 impl<'a,T:'a> TypeFunc<T> for MapMut<'a> {
 	type Output=&'a mut T;
 }
-impl<'a,T:'a> OneOneMappingTypeFunc<&'a mut T> for MapMut<'a> {
+impl<'a,T:'a> BijectiveTypeFunc<&'a mut T> for MapMut<'a> {
 	type Input=T;
 }
 
+/// `|i: (&mut T,T)| {*i.0=i.1;}`
+#[derive(Debug,Default,Clone, Copy)]
+pub struct SetMut;
+
+impl<'a,T> Func<(&'a mut T,T)> for SetMut {
+	type Output=();
+
+	fn call(i: (&'a mut T,T)) -> Self::Output {
+		*i.0=i.1;
+	}
+}
+
+/// `<HList as HMappable<Mapper>>::Output`
+/// 
+/// [HMappable]
 pub type HMap<HList,Mapper>=<HList as HMappable<Mapper>>::Output;
+/// `<HList as HMappable<Poly<Mapper>>>::Output`
+/// 
+/// [HMappable]
 pub type HMapP<HList,Mapper>=<HList as HMappable<Poly<Mapper>>>::Output;
 pub type HZip<A,B>=<A as HZippable<B>>::Zipped;
 pub type HToRef<'a,T>=<T as ToRef<'a>>::Output;
 pub type HToMut<'a,T>=<T as ToMut<'a>>::Output;
+/// `<A as Add<B>>::Output`
+/// 
+/// [Add]
+pub type Sum<A,B>=<A as Add<B>>::Output;
+
+/// map type `HList` by [TypeFunc] `TypeFn`
+/// 
+/// `HList` -> [MapToPhantom] -> `TypeFunc` -> [MapPhantomType]
+/// 
+/// `HMapP<HMapP<HMapP<HList,MapToPhantom>,TypeFn>,MapPhantomType>`
+pub type HTypeMapP<HList,TypeFunc> = HMapP<HMapP<HMapP<HList,MapToPhantom>,TypeFunc>,MapPhantomType>;
+
+/// Convert `TypeFn` from [TypeFunc] to [Func] that can be used in [HMapP]
+/// 
+/// PANICS WHEN USED IN [frunk::HCons::map] AS `mapper`
+/// 
+/// [MapToPhantom] * `TypeFn` * [MapPhantomType]
+/// 
+/// `ChainFunc<ChainFunc<MapToPhantom,TypeFn>,MapPhantomType>`
+pub type HTypeFnToMapper<TypeFn> = ChainFunc<ChainFunc<MapToPhantom,TypeFnAsPhantomFn<TypeFn>>,MapPhantomType>;

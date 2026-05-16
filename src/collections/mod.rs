@@ -3,6 +3,7 @@ pub mod typed_list;
 pub mod int_list;
 // pub mod quad_tree;
 pub mod trie;
+pub mod type_map;
 //pub mod shifted_array;
 //pub mod chain_set;
 //pub mod mult_unordered_list;
