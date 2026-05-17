@@ -2,7 +2,7 @@ use std::{iter::Chain, marker::PhantomData, ops::{Add, Deref, Neg}};
 
 use frunk::{Func, Poly, ToMut, ToRef, hlist::{HMappable, HZippable}};
 
-use crate::utils::type_fn::{BijectiveFunc, BijectiveTypeFunc, ChainFunc, MapFromPhantomPanic, MapPhantomType, TypeFnAsPhantomFn, TypeFunc};
+use crate::utils::type_fn::{BijectiveFunc, BijectiveTypeFunc, ChainFunc, MapPhantomType, TypeFnAsPhantomFn, TypeFunc};
 
 
 

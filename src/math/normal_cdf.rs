@@ -1,7 +1,6 @@
 // use crate::num::Num;
 
-use core::str::FromStr;
-use std::{ops::{Add, Deref, Div, Mul}, sync::{LazyLock, RwLock}};
+use std::sync::{LazyLock, RwLock};
 
 use num_traits::FromPrimitive;
 use simba::scalar::RealField;

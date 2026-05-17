@@ -1,6 +1,5 @@
-use std::{any::{Any, TypeId}, collections::HashMap, sync::{LazyLock, RwLock}};
+use std::{collections::HashMap, sync::{LazyLock, RwLock}};
 
-use either::Either;
 use simba::scalar::RealField;
 
 use crate::{collections::type_map::TypeMap, utils::{factorial::gamma_n_timed_2, rw_lock_error_either::RwLockErrorEither}};
