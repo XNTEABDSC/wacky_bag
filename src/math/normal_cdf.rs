@@ -1,30 +1,18 @@
 // use crate::num::Num;
 
 use core::str::FromStr;
-use std::ops::{Add, Deref, Div, Mul};
+use std::{ops::{Add, Deref, Div, Mul}, sync::{LazyLock, RwLock}};
 
+use num_traits::FromPrimitive;
 use simba::scalar::RealField;
+
+use crate::collections::type_map::TypeMap;
 
 pub const trait NormalCdfConsts<Marker>:Sized
 {
 	// const DATAS:NormalCdfConstsData<Self>;
 	fn datas()->NormalCdfConstsData<Self>;
 }
-
-const trait NormalCdfConstsByFromStr:Sized+FromStr
-{
-	const DATAS:NormalCdfConstsDataMayErr<Self,Self::Err>;
-}
-
-pub const NORMAL_CDF_CONSTS_DATA_STR:NormalCdfConstsData<&'static str>=NormalCdfConstsData{
-	a1:&"0.254829592",
-	a2:&"-0.284496736",
-	a3:&"1.421413741",
-	a4:&"-1.453152027",
-	a5:&"1.061405429",
-	p:&"0.3275911",
-};
-
 
 pub const NORMAL_CDF_CONSTS_DATA_F64:NormalCdfConstsData<f64>=
 NormalCdfConstsData{
@@ -36,38 +24,28 @@ NormalCdfConstsData{
 	p:0.3275911,
 };
 
-const fn map_from_str<Num:const FromStr>(v:&&str)->Result<Num,Num::Err>{
-	FromStr::from_str(v)
-}
+pub struct NormalCdfConstsByFromF64;
 
-impl<T> NormalCdfConstsByFromStr for T 
-	where T:const FromStr
-{
-	const DATAS:NormalCdfConstsData<Result<Self,T::Err>>=
-		NORMAL_CDF_CONSTS_DATA_STR.map_c(&map_from_str);
-}
+pub static NORMAL_CDF_CONSTS_BY_FROM_F64:LazyLock<RwLock<TypeMap>>=LazyLock::new(||Default::default());
 
-pub struct NormalCdfConstsByFromStrMarker;
-
-impl<T> NormalCdfConsts<NormalCdfConstsByFromStrMarker> for T
-	where T:NormalCdfConstsByFromStr+'static
+impl<T> NormalCdfConsts<NormalCdfConstsByFromF64> for T
+	where T:FromPrimitive+Copy+Send+Sync+'static
 {
 	fn datas()->NormalCdfConstsData<Self> {
-		T::DATAS.unwrap()
+		let cs_r=NORMAL_CDF_CONSTS_BY_FROM_F64.read().unwrap();
+		if let Some(cs)=cs_r.get::<NormalCdfConstsData<T>>() {
+			return *cs;
+		}else {
+			drop(cs_r);
+			let mut cs_w=NORMAL_CDF_CONSTS_BY_FROM_F64.write().unwrap();
+			let res=cs_w.entry::<NormalCdfConstsData<T>>().or_insert_with(||{
+				NORMAL_CDF_CONSTS_DATA_F64.map(|v|T::from_f64(v).unwrap())
+			});
+			*res
+		}
 	}
 }
-
-pub type NormalCdfConstsDataMayErr<Num,Err>=NormalCdfConstsData<Result<Num,Err>>;
-
-impl<Num,Err> NormalCdfConstsDataMayErr<Num,Err> {
-	pub fn unwrap(self)->NormalCdfConstsData<Num>{
-		let NormalCdfConstsDataMayErr{ a1:Ok(a1),a2:Ok(a2),a3:Ok(a3),a4:Ok(a4),a5:Ok(a5),p:Ok(p)}=self else {
-			panic!("Unable to parse");
-		};
-		NormalCdfConstsData{a1,a2,a3,a4,a5,p}
-	}
-}
-
+#[derive(Debug,Clone, Copy)]
 pub struct NormalCdfConstsData<Num>
 {
 	pub a1:Num,
@@ -108,12 +86,6 @@ impl<Num> NormalCdfConstsData<Num> {
 pub fn normal_cdf<Num,Marker>(x:Num)->Num 
 	where Num:RealField+Copy+NormalCdfConsts<Marker>
 {
-    // const A1: Result<Num, <Num as FromStr>::Err> = <Num as FromStr>::from_str("0.254829592");
-    // const A2: Result<Num, <Num as FromStr>::Err> = Num::from_str("-0.284496736");
-    // const A3: Result<Num, fixed::ParseFixedError> = Num::from_str("1.421413741");
-    // const A4: Result<Num, fixed::ParseFixedError> = Num::from_str("-1.453152027");
-    // const A5: Result<Num, fixed::ParseFixedError> = Num::from_str("1.061405429");
-    // const P: Result<Num, fixed::ParseFixedError> = Num::from_str("0.3275911");
 	
 	let v=<Num as NormalCdfConsts<Marker>>::datas();
 	let NormalCdfConstsData{a1,a2,a3,a4,a5,p}=v;
@@ -123,6 +95,28 @@ pub fn normal_cdf<Num,Marker>(x:Num)->Num
 	let x2=x.abs()/Num::sqrt(two);
 
     let t= Num::one()/(Num::one()+p*x2);
-    let y=Num::one()-(((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*Num::exp(-x*x);
-    return (Num::one()+sign*y)/Into::<Num>::into(two);
+    let y=Num::one()-(((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*Num::exp(-x2*x2);
+    return (Num::one()+sign*y)/two;
+}
+
+pub fn test_normal_cdf<Num,Marker>()->[Num;5]
+	where Num:RealField+Copy+NormalCdfConsts<Marker>
+{
+	let xs=[
+		(-3.0, 0.00134989803163),	
+		(-1.0, 0.158655253931),
+		( 0.0, 0.5),
+		( 0.5, 0.691462461274),
+		( 2.1 , 0.982135579437),
+	];
+
+	let xs_num=xs.map(|(a,b)|(Num::from_f64(a).unwrap(),Num::from_f64(b).unwrap()));
+	let v=xs_num.map(|(a,b)|(normal_cdf(a)-b).abs());
+	// return v.max_by(|a,b|a.partial_cmp(b).unwrap()).unwrap();
+	return v;
+}
+
+#[test]
+fn test_normal_cdf_f64(){
+	println!("{:?}",test_normal_cdf::<f64,_>());
 }

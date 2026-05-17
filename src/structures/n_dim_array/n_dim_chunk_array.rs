@@ -55,7 +55,7 @@ impl<const DIM: usize, T> NDimChunkArray<DIM, T> {
     pub fn from_fn(
         lens: [usize; DIM],
         dim_elem_count: usize,
-        mut func: impl FnMut(&NDimIndex<DIM>) -> T,
+        mut func: impl FnMut(NDimIndex<DIM>) -> T,
     ) -> Self {
         // let (dim_elem_count,chunk_elem_count)=n_dim_chunk::get_chunk_dim_elem_count::<T,DIM>(n_dim_chunk::COMMON_CHUNK_SIZE);
         let lens_split_data = lens.map(|len| {
@@ -78,7 +78,7 @@ impl<const DIM: usize, T> NDimChunkArray<DIM, T> {
             let chunk_values = NDimArray::from_fn(Owned(chunk_n_dim_indexer), |c_idx| {
                 let full_index =
                     array::from_fn(|i| t_idx[i] * (dim_elem_count as isize) + c_idx[i]);
-                func(&full_index)
+                func(full_index)
             });
             return chunk_values;
         });
@@ -672,7 +672,7 @@ mod test {
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        structures::n_dim_array::t_n_dim_indexer::TNDimIndexer,
+        structures::n_dim_array::{dim_dir::DimDir, n_dim_indexer::NDimIndexer, t_n_dim_indexer::TNDimIndexer},
         traits::scope_no_ret::ThreadScopeCreatorStd,
     };
 
@@ -712,7 +712,7 @@ mod test {
     #[test]
     fn test_par_iter() {
         let ranges = [10, 15, 7];
-        let chunk_array = NDimChunkArray::<3, NDimIndex<3>>::from_fn(ranges, 4, |idx| *idx);
+        let chunk_array = NDimChunkArray::<3, NDimIndex<3>>::from_fn(ranges, 4, |idx| idx);
         let count = Arc::new(Mutex::new(0));
         let exp_count = ranges.iter().fold(1, |a, b| a * b);
         chunk_array.for_each_parallel(
@@ -732,7 +732,7 @@ mod test {
         let ranges = [3, 3, 3];
         let chunk_array = NDimChunkArray::from_fn(ranges, 2, |idx| {
             (
-                *idx,
+                idx,
                 array::from_fn::<Option<NDimIndex<DIM>>, DIM, _>(|_| None),
             )
         });
@@ -751,7 +751,34 @@ mod test {
         let ranges = [3, 3, 3];
         let mut chunk_array = NDimChunkArray::from_fn(ranges, 2, |idx| {
             (
-                *idx,
+                idx,
+                array::from_fn::<Option<NDimIndex<DIM>>, DIM, _>(|_| None),
+            )
+        });
+        // let count=Arc::new(Mutex::new(0));
+        // let exp_count=ranges.iter().fold(1, |a,b|a*(b-1))*DIM;
+        chunk_array.iter_pair_mut_parallel(
+            &|a, b, dim_idx| {
+                println!("({:?},{:?}) at {}", a.0, b.0, dim_idx);
+                a.1[dim_idx] = Some(b.0.clone());
+                // *count.lock().unwrap()+=1;
+            },
+            &ThreadScopeCreatorStd,
+        );
+        // assert_eq!(*count.lock().unwrap(),exp_count);
+        for a in chunk_array.iter() {
+            println!("{:?}", a);
+        }
+    }
+
+	
+    #[test]
+    fn test_par_iter_pair_2() {
+        const DIM: usize = 2;
+        let ranges = [8,8];
+        let mut chunk_array = NDimChunkArray::from_fn(ranges, 8, |idx| {
+            (
+                idx,
                 array::from_fn::<Option<NDimIndex<DIM>>, DIM, _>(|_| None),
             )
         });
@@ -777,7 +804,7 @@ mod test {
         let ranges = [3, 3, 3];
         let mut chunk_array = NDimChunkArray::from_fn(ranges, 1, |idx| {
             (
-                *idx,
+                idx,
                 array::from_fn::<Option<NDimIndex<DIM>>, DIM, _>(|_| None),
             )
         });
@@ -796,4 +823,46 @@ mod test {
             println!("{:?}", a);
         }
     }
+
+	
+    #[test]
+	fn test_array_for_each_edge_parallel(){
+        const DIM: usize = 3;
+        let ranges = [3, 3, 3];
+        let chunk_array = NDimArray::from_fn(Owned(NDimIndexerU::new_len(ranges)), |idx| {
+            (
+                idx,
+                // array::from_fn::<Option<NDimIndex<DIM>>, DIM, _>(|_| None),
+            )
+        });
+		let dim_dir=DimDir{ dim: 1, dir_positive: true };
+		chunk_array.for_each_edge(dim_dir, &mut |a,b|{
+			println!("{:?},{:?}",a.0,b);
+		});
+
+	}
+
+    #[test]
+	fn test_chunk_array_for_each_edge_parallel(){
+        const DIM: usize = 3;
+        let ranges = [3, 3, 3];
+        let chunk_array = NDimChunkArray::from_fn(ranges, 2, |idx| {
+            (
+                idx,
+                // array::from_fn::<Option<NDimIndex<DIM>>, DIM, _>(|_| None),
+            )
+        });
+		let dim_dir=DimDir{ dim: 1, dir_positive: true };
+		chunk_array.for_each_edge(dim_dir, &mut |a,b|{
+			println!("{:?},{:?}",a.0,b);
+		});
+		// chunk_array.values.for_each_edge(dim_dir, &mut |a,b|{
+		// 	println!("at {:?}",b);
+		// 	println!("{:?}",a);
+		// 	a.for_each_edge(dim_dir, &mut |a,b|{
+		// 		println!("{:?}",b);
+		// 	});
+		// });
+
+	}
 }

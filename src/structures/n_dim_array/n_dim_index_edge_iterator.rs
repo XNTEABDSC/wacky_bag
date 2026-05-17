@@ -39,32 +39,34 @@ impl<const DIM:usize, TIndexer> Iterator for NDimIndexEdgeIterator<DIM,TIndexer>
 			return None;
 		}
 		let operator=&mut self.operator;
+		let result=(operator.get().clone(),operator.get_compressed());
 		let dim=self.dim_dir.dim;
 
 		if self.dim_dir.dir_positive {
 			let c=operator.move_n_carry(1);
-			if c!=0 {return None;}// iterating is over
-
+			if c!=0 {self.ended=true;}// iterating is over
+			else 
 			if operator.get()[dim]==0 {// a idx change at mid
 				operator.set_n_at_dim(dim, self.dim_restricted);
 			}
 		}else {
 			let c=operator.move_n_carry(1);
 			if c!=0 {// iterating is over
-				return None;
+				self.ended=true;
 			}
+			else
 			if operator.get()[dim]!=0 {// b idx change at mid
 				operator.set_n_at_dim(dim, 0);
 				if 1<=dim {
 					let c=operator.move_n_carry_at_dim(dim-1, 1);
 					if c!=0 {// iterating is over
-						return None;
+						self.ended=true;
 					}
 				}else {// iterating is over
-					return None;
+					self.ended=true;
 				}
 			}
 		}
-		return Some((self.operator.get().clone(),self.operator.get_compressed()));
+		return Some(result);
 	}
 }
