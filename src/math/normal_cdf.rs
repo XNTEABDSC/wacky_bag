@@ -1,4 +1,6 @@
-// use crate::num::Num;
+
+//! [`normal_cdf`]
+//! via [https://www.johndcook.com/blog/cpp_phi/]
 
 use std::sync::{LazyLock, RwLock};
 
@@ -7,12 +9,19 @@ use simba::scalar::RealField;
 
 use crate::collections::type_map::TypeMap;
 
+/// How to get Constants [`NormalCdfConstsData`] of `Self`
+/// 
+/// `Marker` allows both automated and customized implementation, but must specified if conflict implementation exist.
+/// 
+/// Its is used to be designed for [`const FromStr`][std::str::FromStr], but now using cached [FromPrimitive::from_f64] makes this not that necessary.
+/// 
+/// One could better have a `Marker` generic parameter for generic using.
 pub const trait NormalCdfConsts<Marker>:Sized
 {
-	// const DATAS:NormalCdfConstsData<Self>;
+	/// Get Constants [`NormalCdfConstsData`] of `Self`
 	fn datas()->NormalCdfConstsData<Self>;
 }
-
+/// f64 consts in [https://www.johndcook.com/blog/cpp_phi/]
 pub const NORMAL_CDF_CONSTS_DATA_F64:NormalCdfConstsData<f64>=
 NormalCdfConstsData{
 	a1:0.254829592,
@@ -22,10 +31,10 @@ NormalCdfConstsData{
 	a5:1.061405429,
 	p:0.3275911,
 };
-
+/// get [`NormalCdfConstsData`] via [FromPrimitive::from_f64]
 pub struct NormalCdfConstsByFromF64;
 
-pub static NORMAL_CDF_CONSTS_BY_FROM_F64:LazyLock<RwLock<TypeMap>>=LazyLock::new(||Default::default());
+static NORMAL_CDF_CONSTS_BY_FROM_F64:LazyLock<RwLock<TypeMap>>=LazyLock::new(||Default::default());
 
 impl<T> NormalCdfConsts<NormalCdfConstsByFromF64> for T
 	where T:FromPrimitive+Copy+Send+Sync+'static
@@ -44,7 +53,11 @@ impl<T> NormalCdfConsts<NormalCdfConstsByFromF64> for T
 		}
 	}
 }
+/// Constants used for [`normal_cdf`]
+/// 
+/// see [`NORMAL_CDF_CONSTS_DATA_F64`] for sample.
 #[derive(Debug,Clone, Copy)]
+#[allow(missing_docs)]
 pub struct NormalCdfConstsData<Num>
 {
 	pub a1:Num,
@@ -56,6 +69,7 @@ pub struct NormalCdfConstsData<Num>
 }
 
 impl<Num> NormalCdfConstsData<Num> {
+	/// const map
 	pub const fn map_c<F,B>(&self,f:&F)->NormalCdfConstsData<B>
 		where F: for<'a> const Fn(&'a Num)->B
 	{
@@ -68,6 +82,7 @@ impl<Num> NormalCdfConstsData<Num> {
 			p:f(&self.p),
 		}
 	}
+	/// map
 	pub fn map<F,B>(self,f:F)->NormalCdfConstsData<B>
 		where F:Fn(Num)->B
 	{
@@ -81,7 +96,11 @@ impl<Num> NormalCdfConstsData<Num> {
 		}
 	}
 }
-
+/// Calculates normal cdf.
+/// 
+/// implemented via [https://www.johndcook.com/blog/cpp_phi/].
+/// 
+/// Requires Num: [NormalCdfConsts<Marker>], while a default implementation [`NormalCdfConsts<NormalCdfConstsByFromF64>`][NormalCdfConstsByFromF64] is given so one can use `_` as marker for rust to infer.
 pub fn normal_cdf<Num,Marker>(x:Num)->Num 
 	where Num:RealField+Copy+NormalCdfConsts<Marker>
 {
@@ -97,7 +116,7 @@ pub fn normal_cdf<Num,Marker>(x:Num)->Num
     let y=Num::one()-(((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*Num::exp(-x2*x2);
     return (Num::one()+sign*y)/two;
 }
-
+/// Test [normal_cdf] for `Num`
 pub fn test_normal_cdf<Num,Marker>()->[Num;5]
 	where Num:RealField+Copy+NormalCdfConsts<Marker>
 {
@@ -114,8 +133,11 @@ pub fn test_normal_cdf<Num,Marker>()->[Num;5]
 	// return v.max_by(|a,b|a.partial_cmp(b).unwrap()).unwrap();
 	return v;
 }
-
-#[test]
-fn test_normal_cdf_f64(){
-	println!("{:?}",test_normal_cdf::<f64,_>());
+#[cfg(test)]
+mod test{
+	use super::*;
+	#[test]
+	fn test_normal_cdf_f64(){
+		println!("{:?}",test_normal_cdf::<f64,_>());
+	}
 }

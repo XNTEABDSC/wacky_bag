@@ -1,3 +1,5 @@
+//! [`get_dim_root_of_x_usize`]
+
 use std::{collections::HashMap, sync::{LazyLock, Mutex}};
 
 

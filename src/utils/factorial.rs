@@ -1,3 +1,6 @@
+//! [`factorial`]
+//! [`gamma_n_timed_2`]
+
 use std::sync::{LazyLock, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use either::Either;
@@ -6,6 +9,9 @@ use crate::utils::num_extend::NumExtends;
 
 static FRACTIONAL_VEC:LazyLock<RwLock<Vec<usize>>>=LazyLock::new(||RwLock::new(Vec::new()));
 
+/// v!
+/// 
+/// cached
 pub fn factorial(v:usize)->
 Result<usize,
 Either<

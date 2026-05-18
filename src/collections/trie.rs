@@ -1,14 +1,18 @@
-
+//! [Trie]
 use std::{collections::HashMap, hash::Hash, iter::Chain, mem};
 
-pub struct Trie<Key,TValue>
+/// `Trie` allows walking through a tree via a [Iterator<Item = Key>].
+/// 
+/// `Trie` itself is also the node of the tree. It may contains a `TValue`
+#[derive(Debug,Default)]
+pub struct Trie<Key,Value>
     where Key:Hash+Eq
 {
-    value:Option<TValue>,
-    nexts:HashMap<Key,Trie<Key,TValue>>
+    value:Option<Value>,
+    nexts:HashMap<Key,Trie<Key,Value>>
 }
 
-unsafe impl<Key: Sync, TValue: Sync> Sync for Trie<Key, TValue>
+unsafe impl<Key: Sync, Value: Sync> Sync for Trie<Key, Value>
 where Key:Hash+Eq
 {
 }
@@ -16,10 +20,14 @@ where Key:Hash+Eq
 impl<Key,Value> Trie<Key,Value> 
     where Key:Hash+Eq
 {
+	/// Constructs a enpty `Trie`
     pub fn new()->Self {
         Self { nexts: Default::default(),value:None }
     }
 
+	/// Travels through the `Trie` via a iterator until run out of the iterator, Returning `&Trie`
+	/// 
+	/// Not guarantees that the result contains `Value`.
     pub fn travel(&self,mut index:impl Iterator<Item = Key>)->Option<&Trie<Key,Value>> {
         let key_=index.next();
         if let Some(key)=key_{
@@ -29,6 +37,9 @@ impl<Key,Value> Trie<Key,Value>
         }
     }
 
+	/// Travels through the `Trie` via a iterator until run out of the iterator, Returning `&mut Trie`
+	/// 
+	/// Not guarantees that the result contains `Value`.
     pub fn travel_mut(&mut self,mut index:impl Iterator<Item = Key>)->Option<&mut Trie<Key,Value>> {
         let key_=index.next();
         if let Some(key)=key_{
@@ -59,6 +70,7 @@ impl<Key,Value> Trie<Key,Value>
         }
     } */
 
+	/// Insert a `value:Value` at `index: impl IntoIterator<Item = Key>`, returning `Value` if one exist at `index`
     pub fn insert(&mut self,index:impl IntoIterator<Item = Key>,value:Value)->Option<Value>{
 		let mut index=index.into_iter();
         let key_=index.next();
@@ -78,6 +90,7 @@ impl<Key,Value> Trie<Key,Value>
         }
     }
 
+	/// remove a `Value` at `index: impl IntoIterator<Item = Key>` and return it if exist.
     pub fn remove(&mut self,mut index:impl Iterator<Item = Key>)->Option<Value> {
         let key_=index.next();
         if let Some(key)=key_{
@@ -96,20 +109,53 @@ impl<Key,Value> Trie<Key,Value>
         }
     }
 
+	/// get a `&Value` at `index: impl IntoIterator<Item = Key>` if exist.
     pub fn get(&self,index:impl Iterator<Item = Key>)->Option<&Value> {
         self.travel(index).map_or(None,|n|n.value.as_ref())
     }
 
+	/// get a `&mut Value` at `index: impl IntoIterator<Item = Key>` if exist.
     pub fn get_mut(&mut self,index:impl Iterator<Item = Key>)->Option<&mut Value> {
         self.travel_mut(index).map_or(None,|n|n.value.as_mut())
     }
 
+	/// Whether this `Trie` dont have value and dont have children.
+	/// 
+	/// Not checking whether its children is empty. so this is fast.
     pub fn is_empty(&self)->bool{
-        return  self.value.is_none()&&self.nexts.len()==0;
+        return self.value.is_none()&&self.nexts.len()==0;
+    }
+	
+	/// Whether both this `Trie` and its children dont contains value.
+	/// 
+	/// May be costy.
+    pub fn is_true_empty(&self)->bool{
+        // return self.value.is_none()&&self.nexts.len()==0;
+		if self.value.is_some() {
+			return false;
+		}
+		for c in &self.nexts {
+			if !c.1.is_true_empty() {
+				return false;
+			}
+		}
+		return true;
     }
 
-    pub fn match_get<Iter:Iterator<Item = Key>>(&self,mut index:Iter)->(Option<&Value>,Vec<Key>,Chain< <Vec<Key> as IntoIterator >::IntoIter , Iter>) {
-        let mut unused=Vec::<Key>::new();
+	/// Trying to find the nearest `Value` via `index: impl IntoIterator<Item = Key>`, 
+	/// 
+	/// returning (
+	/// 
+	/// the value if found (only can be `None` if self dont contains value),
+	/// 
+	/// `Vec<Key>` that index the value.
+	/// 
+	/// a iterator about remainings of `index`
+	/// 
+	/// )
+    pub fn match_get<Iter:IntoIterator<Item = Key>>(&self,index:Iter)->(Option<&Value>,Vec<Key>,Chain< <Vec<Key> as IntoIterator >::IntoIter , Iter::IntoIter>) {
+        let mut index=index.into_iter();
+		let mut unused=Vec::<Key>::new();
 		let mut used=Vec::<Key>::new();
         let mut current: &Trie<Key, Value>=self;
         let mut selected:&Trie<Key, Value>=self;

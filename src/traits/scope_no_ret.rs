@@ -1,28 +1,39 @@
+//! defines simple generic behavoir of [`ThreadScope`] e.g. [`thread::scope`]
+
 use std::thread::{self};
 
+/// a scope that can 
 pub trait ThreadScope<'scope>{
+
+	/// Spawns a new thread within a scope
+	/// 
+	/// see [thread::Scope::spawn]
     fn spawn<F>(&self, f: F) ->()
         where
             F: FnOnce()->() + Send + 'scope,
 			;
     
 }
-
+/// use any [`ThreadScope`] to do things
 pub trait ThreadScopeUser<'env>
 {
+	/// use [`ThreadScope`] to do things
     fn use_scope<'scope,TScope>(self, scope:TScope)->()
         where 'env:'scope,
 			TScope:ThreadScope<'scope>;
 }
-
+/// to create a scope
 pub trait ThreadScopeCreator
 {
+	/// Creates a scope for spawning scoped threads.
+	/// 
+	/// see [`thread::scope`]
     fn scope<'env,F>(&self,f:F ) -> ()
         where F:ThreadScopeUser<'env>,
             //'env:'scope
         ;
 }
-
+/// impl [`ThreadScope`] for [`thread::Scope`]
 pub struct ThreadScopeStd<'scope,'env>(pub &'scope thread::Scope<'scope,'env>);
 
 impl<'scope,'env> ThreadScope<'scope> for ThreadScopeStd<'scope,'env> {
@@ -42,6 +53,8 @@ impl<'scope,'env> ThreadScope<'scope> for ThreadScopeStd<'scope,'env> {
 //         self.spawn(f);
 //     }
 // }
+
+/// impl [`ThreadScopeCreator`] for [`thread::scope`]
 pub struct ThreadScopeCreatorStd;
 
 impl ThreadScopeCreator for ThreadScopeCreatorStd {

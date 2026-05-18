@@ -1,6 +1,9 @@
-// #![feature(const_tr)]
+//! wacky_bag contains a lot of things thay may be useful
+
+
 #![feature(const_trait_impl)]
-#![feature(const_convert)]
+// #![feature(const_convert)]
+#![warn(missing_docs)]
 
 pub mod collections;
 pub mod structures;

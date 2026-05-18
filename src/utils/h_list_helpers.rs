@@ -1,8 +1,10 @@
+//! some helper things for h_list
+
 use std::{iter::Chain, marker::PhantomData, ops::{Add, Deref, Neg}};
 
 use frunk::{Func, Poly, ToMut, ToRef, hlist::{HMappable, HZippable}};
 
-use crate::utils::type_fn::{BijectiveFunc, BijectiveTypeFunc, ChainFunc, MapPhantomType, TypeFnAsPhantomFn, TypeFunc};
+use crate::utils::type_fn::{BijectiveFunc, BijectiveTypeFunc, ChainFunc, MapFromPhantomPanic, TypeFnAsPhantomFn, TypeFunc};
 
 
 
@@ -66,7 +68,7 @@ impl<Acc,X,Item> Func<(Acc,X)> for FoldChainIter
 	}
 }
 
-// `x` -> `x.deref()`
+/// `x` -> `x.deref()`
 pub struct MapDeref;
 
 impl<'a,TA,TB> TypeFunc<&'a TA> for MapDeref
@@ -86,7 +88,7 @@ impl<'a,TA,TB> Func<&'a TA> for MapDeref
 }
 
 
-// `ta:TA` -> `ta.deref():TB`, with TF: TA <-> TB specifying
+/// `ta:TA` -> `ta.deref():TB`, with TF: TA <-> TB specified by `TF`
 pub struct MapDerefT<TF>(PhantomData<TF>);
 
 impl<'a,TF,TA,TB> TypeFunc<&'a TA> for MapDerefT<TF> 
@@ -258,8 +260,17 @@ pub type HMap<HList,Mapper>=<HList as HMappable<Mapper>>::Output;
 /// 
 /// [HMappable]
 pub type HMapP<HList,Mapper>=<HList as HMappable<Poly<Mapper>>>::Output;
+/// `<A as HZippable<B>>::Zipped`
+/// 
+/// [HZippable]
 pub type HZip<A,B>=<A as HZippable<B>>::Zipped;
+/// `<T as ToRef<'a>>::Output`
+/// 
+/// [`ToRef`]
 pub type HToRef<'a,T>=<T as ToRef<'a>>::Output;
+/// `<T as ToMut<'a>>::Output`
+/// 
+/// [`ToMut`]
 pub type HToMut<'a,T>=<T as ToMut<'a>>::Output;
 /// `<A as Add<B>>::Output`
 /// 
@@ -268,16 +279,16 @@ pub type Sum<A,B>=<A as Add<B>>::Output;
 
 /// map type `HList` by [TypeFunc] `TypeFn`
 /// 
-/// `HList` -> [MapToPhantom] -> `TypeFunc` -> [MapPhantomType]
+/// `HList` -> [MapToPhantom] -> `TypeFunc` -> [MapFromPhantomPanic]
 /// 
 /// `HMapP<HMapP<HMapP<HList,MapToPhantom>,TypeFn>,MapPhantomType>`
-pub type HTypeMapP<HList,TypeFunc> = HMapP<HMapP<HMapP<HList,MapToPhantom>,TypeFunc>,MapPhantomType>;
+pub type HTypeMapP<HList,TypeFunc> = HMapP<HMapP<HMapP<HList,MapToPhantom>,TypeFunc>,MapFromPhantomPanic>;
 
 /// Convert `TypeFn` from [TypeFunc] to [Func] that can be used in [HMapP]
 /// 
 /// PANICS WHEN USED IN [frunk::HCons::map] AS `mapper`
 /// 
-/// [MapToPhantom] * `TypeFn` * [MapPhantomType]
+/// [MapToPhantom] * `TypeFn` * [MapFromPhantomPanic]
 /// 
 /// `ChainFunc<ChainFunc<MapToPhantom,TypeFn>,MapPhantomType>`
-pub type HTypeFnToMapper<TypeFn> = ChainFunc<ChainFunc<MapToPhantom,TypeFnAsPhantomFn<TypeFn>>,MapPhantomType>;
+pub type HTypeFnToMapper<TypeFn> = ChainFunc<ChainFunc<MapToPhantom,TypeFnAsPhantomFn<TypeFn>>,MapFromPhantomPanic>;

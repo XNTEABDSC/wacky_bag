@@ -1,3 +1,5 @@
+//! [`NDimChunkArray`]
+
 use std::{
     array,
     mem::transmute,
@@ -16,6 +18,8 @@ use crate::structures::{
         },
     },
 };
+
+/// [`NDimArray`] of [`NDimArray`] that keep square of items in chunk
 #[derive(Debug, Clone)]
 pub struct NDimChunkArray<const DIM: usize, T> {
     values: NDimArray<
@@ -65,7 +69,7 @@ impl<const DIM: usize, T> NDimChunkArray<DIM, T> {
             (div, rem)
         });
         let chunks_lens = lens_split_data.map(|(div, rem)| if rem > 0 { div + 1 } else { div });
-        let chunks_n_dim_indexer = NDimIndexerU::new_len(chunks_lens);
+        let chunks_n_dim_indexer = NDimIndexerU::from_lens(chunks_lens);
         let values = NDimArray::from_fn(Owned(chunks_n_dim_indexer), |t_idx| {
             let chunk_index: [usize; DIM] = array::from_fn(|i| {
                 if (t_idx[i] as usize) == lens_split_data[i].0 {
@@ -74,7 +78,7 @@ impl<const DIM: usize, T> NDimChunkArray<DIM, T> {
                     dim_elem_count
                 }
             });
-            let chunk_n_dim_indexer = NDimIndexerU::new_len(chunk_index);
+            let chunk_n_dim_indexer = NDimIndexerU::from_lens(chunk_index);
             let chunk_values = NDimArray::from_fn(Owned(chunk_n_dim_indexer), |c_idx| {
                 let full_index =
                     array::from_fn(|i| t_idx[i] * (dim_elem_count as isize) + c_idx[i]);
@@ -297,9 +301,9 @@ impl<const DIM: usize, T> TNDimArrayIterPair<DIM, T> for NDimChunkArray<DIM, T> 
             });
         });
         self.values.iter_pair(&mut |chunka, chunkb, dim| {
-            let a_uw = chunka.unwrap_ref();
-            let b_uw = chunkb.unwrap_ref();
-            let a_end_i = a_uw.0.lens()[dim] as isize - 1;
+            let a_uw = chunka.inner();
+            let b_uw = chunkb.inner();
+            let a_end_i = a_uw.0.lens_u()[dim] as isize - 1;
             let mut a_idx_op = NDimIndexOperator::from_index(
                 a_uw.0.deref(),
                 array::from_fn::<_, DIM, _>(|d| if d == dim { a_end_i } else { 0 }),
@@ -372,9 +376,9 @@ impl<const DIM: usize, T> TNDimArrayIterPair<DIM, T> for NDimChunkArray<DIM, T> 
         >,
                                     chunkb,
                                     dim| {
-            let a_uw = chunka.unwrap_mut();
-            let b_uw = chunkb.unwrap_mut();
-            let a_end_i = a_uw.0.lens()[dim] as isize - 1;
+            let a_uw = unsafe {chunka.inner_mut()};
+            let b_uw = unsafe {chunkb.inner_mut()};
+            let a_end_i = a_uw.0.lens_u()[dim] as isize - 1;
             let mut a_idx_op = NDimIndexOperator::from_index(
                 a_uw.0.deref().deref(),
                 array::from_fn::<_, DIM, _>(|d| if d == dim { a_end_i } else { 0 }),
@@ -461,9 +465,9 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
         );
         self.values.iter_pair_parallel(
             &|chunka: &NDimArray<Owned<NDimIndexerU<DIM>>, DIM, T, Vec<T>>, chunkb, dim| {
-                let a_uw = chunka.unwrap_ref();
-                let b_uw = chunkb.unwrap_ref();
-                let a_end_i = a_uw.0.lens()[dim] as isize - 1;
+                let a_uw = chunka.inner();
+                let b_uw = chunkb.inner();
+                let a_end_i = a_uw.0.lens_u()[dim] as isize - 1;
                 let mut a_idx_op = NDimIndexOperator::from_index(
                     a_uw.0.deref(),
                     array::from_fn::<_, DIM, _>(|d| if d == dim { a_end_i } else { 0 }),
@@ -548,9 +552,9 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
         );
         self.values.iter_pair_mut_parallel(
             &|chunka: &mut NDimArray<Owned<NDimIndexerU<DIM>>, DIM, T, Vec<T>>, chunkb, dim| {
-                let a_uw = chunka.unwrap_mut();
-                let b_uw = chunkb.unwrap_mut();
-                let a_end_i = a_uw.0.lens()[dim] as isize - 1;
+                let a_uw = unsafe {chunka.inner_mut()};
+                let b_uw = unsafe {chunkb.inner_mut()};
+                let a_end_i = a_uw.0.lens_u()[dim] as isize - 1;
                 let mut a_idx_op = NDimIndexOperator::from_index(
                     a_uw.0.deref().deref(),
                     array::from_fn::<_, DIM, _>(|d| if d == dim { a_end_i } else { 0 }),
@@ -579,9 +583,10 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
                     }
                     let c = b_idx_op.move_n_carry(1);
                     if c != 0 {
-                        // iterating is over
-                        assert!(false, "not synchronous carry of 2 index iterating");
-                        break;
+                        // iterating is over, but not synchronous with a_idx_op
+						panic!("not synchronous carry of 2 index iterating");
+                        // assert!(false, "not synchronous carry of 2 index iterating");
+                        // break;
                     }
                     if b_idx_op.get()[dim] != 0 {
                         // b idx change at mid
@@ -597,9 +602,9 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
                                 break;
                             }
                         } else {
-                            // iterating is over
-                            assert!(false, "not synchronous carry of 2 index iterating");
-                            break;
+                            // iterating is over, but not synchronous with a_idx_op
+							panic!("not synchronous carry of 2 index iterating");
+                            // break;
                         }
                     }
                 }
@@ -608,7 +613,7 @@ impl<const DIM: usize, T> TNDimArrayIterPairParallel<DIM, T> for NDimChunkArray<
         );
     }
 }
-
+/// Iterate [`NDimChunkArray`]
 pub struct NDimChunkArrayIter<'a, const DIM: usize, T> {
     // chunk_array:&'a NDimChunkArray<DIM,T>,
     chunk_iter:
@@ -649,6 +654,7 @@ impl<'a, const DIM: usize, T> Iterator for NDimChunkArrayIter<'a, DIM, T> {
 
 
 impl<'a, const DIM: usize, T> NDimChunkArray<DIM, T> {
+	/// get iter
     pub fn iter(&'a self) -> NDimChunkArrayIter<'a, DIM, T> {
         NDimChunkArrayIter {
             chunk_iter: self.values.values().iter(),
@@ -669,10 +675,12 @@ impl<'a, const DIM: usize, T> IntoIterator for &'a NDimChunkArray<DIM, T> {
 
 #[cfg(test)]
 mod test {
+	#![allow(unused)]
+
     use std::sync::{Arc, Mutex};
 
     use crate::{
-        structures::n_dim_array::{dim_dir::DimDir, n_dim_indexer::NDimIndexer, t_n_dim_indexer::TNDimIndexer},
+        structures::n_dim_array::{dim_dir::DimDir, t_n_dim_indexer::TNDimIndexer},
         traits::scope_no_ret::ThreadScopeCreatorStd,
     };
 
@@ -740,7 +748,7 @@ mod test {
             println!(
                 "{:?}'s shape: {:?}",
                 a,
-                chunk_array.values.get(&a).unwrap().n_dim_index().lens()
+                chunk_array.values.get(&a).unwrap().n_dim_index().lens_u()
             );
         }
     }
@@ -829,7 +837,7 @@ mod test {
 	fn test_array_for_each_edge_parallel(){
         const DIM: usize = 3;
         let ranges = [3, 3, 3];
-        let chunk_array = NDimArray::from_fn(Owned(NDimIndexerU::new_len(ranges)), |idx| {
+        let chunk_array = NDimArray::from_fn(Owned(NDimIndexerU::from_lens(ranges)), |idx| {
             (
                 idx,
                 // array::from_fn::<Option<NDimIndex<DIM>>, DIM, _>(|_| None),

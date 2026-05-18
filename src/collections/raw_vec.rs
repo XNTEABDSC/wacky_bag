@@ -1,4 +1,7 @@
-// from https://nomicon.purewhite.io/vec/vec-raw.html
+// not docing things that is not important
+#![allow(missing_docs)]
+
+//! from https://nomicon.purewhite.io/vec/vec-raw.html
 
 use std::alloc::{self, Layout};
 use std::mem::transmute;
@@ -7,6 +10,8 @@ use std::{cmp, mem};
 use std::ptr::NonNull;
 use std::ptr::{self};
 
+/// from https://nomicon.purewhite.io/vec/vec-raw.html
+/// RawVec allows free, unsafe control of a vec
 pub struct RawVec<T> {
     ptr: NonNull<T>,
     cap: usize,
@@ -16,6 +21,7 @@ unsafe impl<T: Send> Send for RawVec<T> {}
 unsafe impl<T: Sync> Sync for RawVec<T> {}
 
 impl<T> RawVec<T> {
+	/// Constructs a new, empty `RawVec<T>`.
     pub const fn new() -> Self {
         // !0 等价于 usize::MAX， 这一段分支代码在编译期间就可以计算出结果返回的结果，返回给 cap
         let cap = if mem::size_of::<T>() == 0 { !0 } else { 0 };
@@ -26,8 +32,9 @@ impl<T> RawVec<T> {
             ptr: NonNull::dangling(),
             cap: cap,
         }
+		
     }
-
+	/// Constructs a new, empty `Vec<T>` with at least the specified capacity.
     pub fn with_capacity(cap:usize) -> RawVec<T> {
         if mem::size_of::<T>() != 0 {
             let layout=Layout::array::<T>(cap).unwrap();

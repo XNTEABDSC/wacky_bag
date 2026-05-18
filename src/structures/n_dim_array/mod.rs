@@ -1,3 +1,5 @@
+//! Mainly [`n_dim_chunk_array::NDimChunkArray`]
+//! NDimArray is mainly for grid simulation and pair iteration.
 
 pub mod n_dim_array;
 pub mod n_dim_index;

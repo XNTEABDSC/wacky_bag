@@ -1,3 +1,6 @@
+// not docing things that is not important (not used and may be even I forgot what they does)
+#![allow(missing_docs)]
+/// just use crate derive_more
 #[macro_export]
 macro_rules! derive_add_traits {
     ($T:ty) => {

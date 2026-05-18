@@ -1,21 +1,24 @@
-use std::sync::LazyLock;
-use std::{collections::BinaryHeap, sync::Mutex, usize};
+//! [`GridIter`]
+
+use std::sync::{LazyLock, RwLock};
+use std::{collections::BinaryHeap, usize};
 //use lazy_static::lazy_static;
-use std::num::Wrapping;
-/// Enum grid position, by the other of the distance of grid's closest point to (0,0)
+
+/// Enum grid position, by the order of the distance of grid's (i-0.5,j-0.5,1,1) closest point to (0,0)
 /// 0<=y<=x
 /// includes (0,0)
 /// automatically grow
 /// safe for multiple iter itering parallelly
 pub struct GridIter{
-    index:Wrapping<usize>
+    index:usize
 }
-pub struct ToOct{
+// struct ToOct{
 
-}
+// }
 
 type Point=(i32,i32);
-
+/// point and distance
+#[allow(missing_docs)]
 pub struct PointAndDistance{
     pub point:Point,
     pub distance:f32,
@@ -50,8 +53,8 @@ struct GridIterData{
     pub grid_iter_unchecked_len:BinaryHeap<PointAndDistance>,
 }
 
-static GRID_ITER_UNCHECKED_LEN_MUTEX: LazyLock<Mutex<GridIterData>> =LazyLock::new(||{
-    Mutex::new( 
+static GRID_ITER_UNCHECKED_LEN_MUTEX: LazyLock<RwLock<GridIterData>> =LazyLock::new(||{
+    RwLock::new( 
         GridIterData{
             grid_iter_unchecked_len:BinaryHeap::<PointAndDistance>::new(),
             grid_iter_checked_len:-1,
@@ -73,7 +76,7 @@ static GRID_ITER_UNCHECKED_LEN_MUTEX: LazyLock<Mutex<GridIterData>> =LazyLock::n
 
 fn grow(needed:usize){
     {
-        let mut dwadwad=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
+        let mut dwadwad=GRID_ITER_UNCHECKED_LEN_MUTEX.write().unwrap();
         
         //let mut grid_iter_unchecked_len=&mut dwadwad.grid_iter_unchecked_len;
         //let mut grid_iter_checked_cache=&mut dwadwad.grid_iter_checked_cache;
@@ -123,26 +126,24 @@ fn grow(needed:usize){
     }
 }
 impl GridIter {
-    pub fn new()->Self{Self{index:Wrapping( usize::MAX)}}
+	/// new
+    pub fn new()->Self{Self{index: 0}}
 }
 impl Iterator for GridIter {
     type Item=&'static PointAndDistance;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.index=self.index+Wrapping(1);
-        let i=self.index.0;
-        let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
+        let i=self.index;
+        self.index=self.index+1;
+        let mut lock=GRID_ITER_UNCHECKED_LEN_MUTEX.read().unwrap();
 
         if i>=lock.grid_iter_checked_cache.len()
         {
             drop(lock);
             grow(i);
+			lock=GRID_ITER_UNCHECKED_LEN_MUTEX.read().unwrap();
         }
-        else {
-            drop(lock);
-        }
-        let lock=GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap();
-        //GRID_ITER_UNCHECKED_LEN_MUTEX.lock().unwrap().grid_iter_checked_cache
+		
         let awd=lock.grid_iter_checked_cache.as_ptr();
         drop(lock);
         return unsafe {
@@ -155,7 +156,7 @@ impl Iterator for GridIter {
 fn test_grid_iter_thread(){
     use std::thread;
     let mut handles=Vec::new();
-    for i in 10..10000 {
+    for i in 10..100 {
         handles.push(thread::spawn(move ||{
             let mut count=0;
             for p in GridIter::new() {
@@ -163,7 +164,7 @@ fn test_grid_iter_thread(){
                 if count>=i {
                     break;
                 }
-                if i%100==0{
+                if i%10==0{
                     println!("{},{}",p.point.0,p.point.1)
                 }
             }

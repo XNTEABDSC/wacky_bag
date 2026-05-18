@@ -1,6 +1,7 @@
+// not docing things that is not important (not used and may be even I forgot what they does)
+#![allow(missing_docs)]
 
-
-//$crate::collections::typed_list::
+/// generates a [Vec] whose all element implements `trait_name`
 #[macro_export]
 macro_rules! make_typed_list {
     (  $type_name:ident,$trait_name:ident )=>{

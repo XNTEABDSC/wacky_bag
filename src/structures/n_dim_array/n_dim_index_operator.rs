@@ -1,8 +1,10 @@
+//! [NDimIndexOperator]
+
 use std::ops::{ControlFlow, Deref};
 
 use crate::{structures::n_dim_array::{n_dim_index::NDimIndex, t_n_dim_indexer::TNDimIndexer}, utils::loop_wrap::loop_wrap_assign};
 
-
+/// operating [`NDimIndex`] while keep tracking compressed index
 #[derive(Debug,Clone, Copy)]
 pub struct NDimIndexOperator<const DIM:usize,TIndexer>{
 	indexer:TIndexer,
@@ -13,12 +15,18 @@ pub struct NDimIndexOperator<const DIM:usize,TIndexer>{
 impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 	where TIndexer: Deref<Target : TNDimIndexer<DIM>>
 {
+	/// construct by raw datas.
+	/// 
+	/// # Safety
+	/// 
+	/// `index` and `compressed` must matches or unknow behavior occurs
 	pub unsafe fn from_raw(indexer:TIndexer,index:NDimIndex<DIM>,compressed:usize)->Self{
 		NDimIndexOperator{
 			index,indexer,compressed
 		}
 	}
 
+	/// Create by [`NDimIndex`]
 	pub fn from_index(indexer:TIndexer,index:NDimIndex<DIM>)->Option<Self>{
 		if !indexer.contains(&index){
 			return None;
@@ -29,6 +37,7 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 		});
 	}
 
+	/// Create by compressed index
 	pub fn from_compressed(indexer:TIndexer,compressed:usize)->Option<Self>{
 		if !indexer.contains_compressed(compressed) {
 			return None;
@@ -39,26 +48,32 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 		});
 	}
 
+	/// get [`NDimIndex`]
 	pub fn get(&self)->&NDimIndex<DIM>{
 		&self.index
 	}
 
+	/// get compressed index
 	pub fn get_compressed(&self)->usize{
 		self.compressed
 	}
 
+	/// get `TIndexer`
 	pub fn get_indexer(&self)->&TIndexer{
 		&self.indexer
 	}
 
+	/// add compressed index by n with carrying
 	pub fn move_n_carry(&mut self,n:isize)->isize{
 		self.move_n_carry_at_dim(DIM-1, n)
 	}
-	pub fn move_n_carry_at_dim(&mut self,dim_idx:usize,n:isize)->isize{
-		let step_at_dim=self.indexer.steps()[dim_idx];
+	
+	/// add index at `dim` by n with carrying
+	pub fn move_n_carry_at_dim(&mut self,dim:usize,n:isize)->isize{
+		let step_at_dim=self.indexer.steps()[dim];
 		let res=self.index.iter_mut().zip(
 			self.indexer.lens().iter()
-		).rev().skip(DIM-dim_idx-1).try_fold(n, |c,idx|{
+		).rev().skip(DIM-dim-1).try_fold(n, |c,idx|{
 			*idx.0+=c;
 			let n=loop_wrap_assign(idx.0, idx.1, idx.1.end-idx.1.start) as isize;
 			if n==0 {
@@ -77,6 +92,7 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 
 		return c2;
 	}
+	/// add index at `dim` by n, return carrying
 	pub fn move_n_at_dim(&mut self,dim_idx:usize,mut n:isize)->isize{
 		let range=&self.indexer.lens()[dim_idx];
 		let range_len=range.end-range.start;
@@ -89,6 +105,7 @@ impl<const DIM:usize,TIndexer> NDimIndexOperator<DIM,TIndexer>
 		self.index[dim_idx]=new_index_at_dim;
 		return c;
 	}
+	/// set index at `dim` by n
 	pub fn set_n_at_dim(&mut self,dim_idx:usize,n:isize){
 		// self.move_n_at_dim(dim_idx, n-(self.index[dim_idx] as isize))
 		let range=&self.indexer.lens()[dim_idx];
@@ -113,7 +130,7 @@ mod test{
 	use super::*;
 	#[test]
 	fn test1(){
-		let a_idxer=NDimIndexer::new_len([0..5,0..5,0..5]);
+		let a_idxer=NDimIndexer::from_ranges([0..5,0..5,0..5]);
 
 		let check=|op: &NDimIndexOperator<3, &NDimIndexer<3>>,b|{
 			assert_eq!(op.get(),b);

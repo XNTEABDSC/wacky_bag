@@ -1,3 +1,6 @@
+// not docing things that is not important (not used and may be even I forgot what they does)
+#![allow(missing_docs)]
+
 use std::ops::ControlFlow;
 
 pub trait SteppingIteratorFunction<Item,Data>{

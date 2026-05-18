@@ -1,3 +1,5 @@
+//! trait defines NDimArray methods
+
 use std::{
     mem::transmute,
     ops::{Deref, Range},
@@ -10,11 +12,13 @@ use crate::{
     },
     traits::scope_no_ret::ThreadScopeCreator,
 };
-
+/// trait defines basic NDimArray methods.
 pub trait TNDimArray<const DIM: usize, T> {
+	/// range of [`NDimIndex`]
     fn lens(&self) -> impl Deref<Target = [Range<isize>; DIM]>;
-
+	/// get ref value via [`NDimIndex`]
     fn get(&self, indexes: &NDimIndex<DIM>) -> Option<&T>;
+	/// get mut ref value via [`NDimIndex`]
     fn get_mut(&mut self, indexes: &NDimIndex<DIM>) -> Option<&mut T>;
 
     // fn for_each_mut<Func>(&mut self, func: &Func)
@@ -31,14 +35,21 @@ pub trait TNDimArray<const DIM: usize, T> {
     //     T: Send + Sync;
 }
 
+/// result of methods in [`TNDimArrayGetWithNeiborhoods`]
 #[derive(Debug)]
 pub struct NDimArrayGetWithNeiborhoodsResult<const DIM: usize, T, TNeiborhood> {
+	/// current value
     pub cur: T,
+	/// neiborhoods, for each dim, previous and next value.
     pub neiborhoods: [((TNeiborhood, NDimIndex<DIM>), (TNeiborhood, NDimIndex<DIM>)); DIM],
 }
-
+/// trait defines NDimArray methods about getting neiborhoods at index.
+/// not frequently used, consider [TNDimArrayIterPair]
+#[allow(missing_docs)]
 pub trait TNDimArrayGetWithNeiborhoods<'a, const DIM: usize, T>: TNDimArray<DIM, T> {
+	/// inner indexer used
     type TIndexer: Deref<Target: TNDimIndexer<DIM>> + 'a;
+	/// get ref value and neiborhoods values
     fn get_with_neiborhoods_generic<ForNeiborhood, NeiborhoodResult>(
         &'a self,
         index: &NDimIndex<DIM>,
@@ -53,6 +64,7 @@ pub trait TNDimArrayGetWithNeiborhoods<'a, const DIM: usize, T>: TNDimArray<DIM,
             bool,
         ) -> NeiborhoodResult;
 
+	/// get mut ref value and neiborhoods values
     fn get_mut_with_neiborhoods_generic<ForNeiborhood, NeiborhoodResult>(
         &'a mut self,
         index: &NDimIndex<DIM>,
@@ -125,19 +137,23 @@ pub trait TNDimArrayGetWithNeiborhoods<'a, const DIM: usize, T>: TNDimArray<DIM,
     }
 }
 
+/// for each elements
 pub trait TNDimArrayForEach<const DIM: usize, T>: TNDimArray<DIM, T> {
+	/// for each elements
     fn for_each<'env, Func>(&'env self, func: &mut Func)
     where
         Func: FnMut(&'env T, NDimIndex<DIM>),
         T: 'env;
 
+	/// for each elements
     fn for_each_mut<'env, Func>(&'env mut self, func: &mut Func)
     where
         Func: FnMut(&'env mut T, NDimIndex<DIM>),
         T: 'env;
 }
-
+/// parallel for each
 pub trait TNDimArrayForEachParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
+	/// parallel for each
     fn for_each_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env self,
         func: &Func,
@@ -147,6 +163,7 @@ pub trait TNDimArrayForEachParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
         TScopeCreator: ThreadScopeCreator + Sync,
         T: Send + Sync;
 
+	/// parallel for each
     fn for_each_mut_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env mut self,
         func: &Func,
@@ -167,19 +184,23 @@ pub trait TNDimArrayForEachParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
 // 	}
 // }
 
+/// for each all possible neiborhoods items pairs (a,b), where a's index is smaller tha b's. 
 pub trait TNDimArrayIterPair<const DIM: usize, T>: TNDimArray<DIM, T> {
+	/// for each all possible neiborhoods items pairs (a,b), where a's index is smaller tha b's. 
     fn iter_pair<'ext_env, Func>(&'ext_env self, func: &mut Func)
     where
         Func: for<'scope> FnMut(&'scope T, &'scope T, usize),
 		T:'ext_env
 		;
 
+	/// for each all possible neiborhoods items pairs (a,b), where a's index is smaller tha b's. 
     fn iter_pair_mut<'ext_env, Func>(&'ext_env mut self, func: &mut Func)
     where
         Func: for<'scope> FnMut(&'scope mut T, &'scope mut T, usize),
 		T:'ext_env
 		;
-
+	
+	/// for each all possible neiborhoods items pairs (a,b) and (b,a). 
 	fn iter_pair_2_side<'ext_env, Func>(&'ext_env self, func: &mut Func)
     where
         Func: for<'scope> FnMut(&'scope T, &'scope T, DimDir),
@@ -191,6 +212,7 @@ pub trait TNDimArrayIterPair<const DIM: usize, T>: TNDimArray<DIM, T> {
 		});
 	}
 
+	/// for each all possible neiborhoods items pairs (a,b) and (b,a). 
 	fn iter_pair_2_side_mut<'ext_env, Func>(&'ext_env mut self, func: &mut Func)
     where
         Func: for<'scope> FnMut(&'scope mut T, &'scope mut T, DimDir),
@@ -203,7 +225,10 @@ pub trait TNDimArrayIterPair<const DIM: usize, T>: TNDimArray<DIM, T> {
 	}
 }
 
+/// parallel for each all possible neiborhoods items pairs (a,b), where a's index is smaller tha b's. 
 pub trait TNDimArrayIterPairParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
+	
+	/// parallel for each all possible neiborhoods items pairs (a,b), where a's index is smaller tha b's. 
     fn iter_pair_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env self,
         func: &Func,
@@ -213,6 +238,7 @@ pub trait TNDimArrayIterPairParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
         TScopeCreator: ThreadScopeCreator + Sync,
         T: Send + Sync;
 
+	/// parallel for each all possible neiborhoods items pairs (a,b) and (b,a). 
 	fn iter_pair_2_side_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env self,
         func: &Func,
@@ -227,6 +253,10 @@ pub trait TNDimArrayIterPairParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
 		}, scope_creator);
 	}
 
+	
+	/// parallel for each all possible neiborhoods items pairs (a,b), where a's index is smaller tha b's. 
+	/// 
+	/// while multiple neiborhoods exists for one item, this ensures (must ensures) only one mut ref of one item exists as same time.
     fn iter_pair_mut_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env mut self,
         func: &Func,
@@ -236,6 +266,7 @@ pub trait TNDimArrayIterPairParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
         TScopeCreator: ThreadScopeCreator + Sync,
         T: Send + Sync;
 
+	/// parallel for each all possible neiborhoods items pairs (a,b) and (b,a). 
 	fn iter_pair_2_side_mut_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env mut self,
         func: &Func,
@@ -250,20 +281,24 @@ pub trait TNDimArrayIterPairParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
 		}, scope_creator);
 	}
 }
-
+/// for each all items at edge
 pub trait TNDimArrayForEachEdge<const DIM: usize, T>: TNDimArray<DIM, T> {
+	/// for each all items at edge
     fn for_each_edge<'ext_env, Func>(&'ext_env self, dim_dir: DimDir, func: &mut Func)
     where
         Func: FnMut(&'ext_env T, NDimIndex<DIM>),
         T: Send + Sync + 'ext_env;
 
+	/// for each all items at edge
     fn for_each_edge_mut<'ext_env, Func>(&'ext_env mut self, dim_dir: DimDir, func: &mut Func)
     where
         Func: FnMut(&'ext_env mut T, NDimIndex<DIM>),
         T: Send + Sync + 'ext_env;
 }
 
+/// parallel for each all items at edge
 pub trait TNDimArrayForEachEdgeParallel<const DIM: usize, T>: TNDimArray<DIM, T> {
+	/// parallel for each all items at edge
     fn for_each_edge_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env self,
         dim_dir: DimDir,
@@ -273,7 +308,7 @@ pub trait TNDimArrayForEachEdgeParallel<const DIM: usize, T>: TNDimArray<DIM, T>
         Func: for<'scope> Fn(&'scope T, NDimIndex<DIM>) + 'ext_env + Sync + Send,
         TScopeCreator: ThreadScopeCreator + Sync,
         T: Send + Sync;
-
+	/// parallel for each all items at edge
     fn for_each_edge_mut_parallel<'ext_env, Func, TScopeCreator>(
         &'ext_env mut self,
         dim_dir: DimDir,

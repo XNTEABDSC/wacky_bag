@@ -1,12 +1,16 @@
+//! [`HSelectZippable`]
+
 use frunk::{HCons, HNil, Poly};
 
 use crate::utils::type_fn::TypeFunc;
 
 
-/// with [TypeFunc], it can be used to select\generate expected type 
+/// select b with [TypeFunc], and zip
 pub trait HSelectZippable<TypeFunc,B>
 {
+	/// the result
 	type Output;
+	/// select b with tf, and zip
 	fn select_zip(self,tf:TypeFunc,b:B)->Self::Output;
 }
 

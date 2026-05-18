@@ -1,37 +1,41 @@
+//! [NDimIndexer]
+
 use std::{array, ops::{Deref, Range}};
 
 use crate::structures::n_dim_array::{n_dim_index::NDimIndex, t_n_dim_indexer::TNDimIndexer};
 
 
-/// convert indexes with N dimensions in range and usize
+/// convert between [`NDimIndex`] and compressed usize
 #[derive(Debug,Clone)]
 pub struct NDimIndexer<const DIM:usize>{
     starts:[isize;DIM],
     steps:[usize;DIM],
     length:usize,
-    lens:[Range<isize>;DIM],
+    ranges:[Range<isize>;DIM],
 }
 
 
 
 impl<const DIM:usize> NDimIndexer<DIM> {
-    pub fn new_len(lens:[Range<isize>;DIM])->Self{
+	/// Creates from [`Range<isize>`]s
+    pub fn from_ranges(ranges:[Range<isize>;DIM])->Self{
         let mut starts=[0isize;DIM];
         let mut steps=[0usize;DIM];
         let mut cur_length:usize=1;
         for i in (0..DIM).rev() {
-            starts[i]=lens[i].start;
+            starts[i]=ranges[i].start;
             steps[i]=cur_length;
-            let dim_len= (lens[i].end-lens[i].start) as usize;
+            let dim_len= (ranges[i].end-ranges[i].start) as usize;
             cur_length*=dim_len;
         }
-        Self { starts, steps, length:cur_length as usize, lens }
+        Self { starts, steps, length:cur_length as usize, ranges }
     }
+	/// get the [`Range::start`]s
     pub fn starts(&self)->&[isize;DIM]{&self.starts}
 }
 
 impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
-    fn lens(&self)->impl Deref<Target = [std::ops::Range<isize>; DIM]>{&self.lens}
+    fn lens(&self)->impl Deref<Target = [std::ops::Range<isize>; DIM]>{&self.ranges}
 	fn steps(&self)->&[usize;DIM]{&self.steps}
     // fn length(&self)->&Range<isize>{&self.range}
     fn length(&self)->impl Deref<Target = usize>{&self.length}
@@ -39,7 +43,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
     fn contains(&self,indexes:&NDimIndex<DIM>)->bool{
         //let mut pass=true;
         for i in 0..DIM {
-            if self.lens[i].contains(&indexes[i]){
+            if self.ranges[i].contains(&indexes[i]){
                 //pass=true
             }else {
                 return false;
@@ -55,7 +59,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
     fn compress_index(&self,indexes:&NDimIndex<DIM>)->usize{
         let mut res:usize=0;
         for i in 0..DIM {
-            res+=(indexes[i]-self.lens[i].start) as usize * self.steps[i];
+            res+=(indexes[i]-self.ranges[i].start) as usize * self.steps[i];
         }
         res
     }
@@ -64,7 +68,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
             let step=self.steps[i];
             let (div,rem)=(compressed_index/step,compressed_index%step);
             compressed_index=div;
-            rem as isize + self.lens[i].start
+            rem as isize + self.ranges[i].start
         })
     }
 	
@@ -78,7 +82,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
 			let prev_step=self.steps[prev_dim];
 			compressed_index=compressed_index%prev_step;
 		}
-		return (compressed_index/step) as isize + self.lens[dim].start;
+		return (compressed_index/step) as isize + self.ranges[dim].start;
 	}
 	
 	fn add_index_at_dim(&self,compressed_index:usize,dim:usize,add_index:isize)->usize {
@@ -129,7 +133,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexer<DIM>{
 
 #[test]
 fn test() {
-    let a_ndidxer=NDimIndexer::new_len([-5..5,-5..5,-5..5]);
+    let a_ndidxer=NDimIndexer::from_ranges([-5..5,-5..5,-5..5]);
     let a_ndidx=[-2,0,2];
     let a_cidx=a_ndidxer.compress_index(&a_ndidx);
     println!("{:?}",a_ndidxer.starts());
@@ -146,7 +150,7 @@ fn test() {
 
 #[test]
 fn test_iterate(){
-    let indexer=NDimIndexer::new_len([0..2,0..3,0..4]);
+    let indexer=NDimIndexer::from_ranges([0..2,0..3,0..4]);
     for i in indexer.iter() {
         println!("{:?} : {}",i,indexer.compress_index(&i));
     }

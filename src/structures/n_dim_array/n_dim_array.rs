@@ -1,3 +1,5 @@
+//! [`NDimArray`]
+
 use std::{
     array,
     mem::transmute,
@@ -19,6 +21,7 @@ use crate::{
     traits::scope_no_ret::{self, ThreadScopeCreator, ThreadScopeUser},
 };
 
+/// N Dimension grid. Indexed by [`NDimIndex`]
 #[derive(Debug,Clone)]
 pub struct NDimArray<TIndexer, const DIM: usize, T, Storage>
 where
@@ -41,6 +44,7 @@ impl<TIndexer, const DIM: usize, T> NDimArray<TIndexer, DIM, T, Vec<T>>
 where
     TIndexer: Deref<Target: TNDimIndexer<DIM>>,
 {
+	/// Constructs by `func` generating each element
     pub fn from_fn<Fn>(n_dim_index: TIndexer, mut func: Fn) -> Self
     where
         Fn: FnMut(NDimIndex<DIM>) -> T,
@@ -59,46 +63,61 @@ where
     TIndexer: Deref<Target: TNDimIndexer<DIM>>,
     Storage: Index<usize, Output = T> + IndexMut<usize>,
 {
-    pub fn new(n_dim_index: TIndexer, values: Storage) -> Self {
+	/// Constructs by raw data.
+    pub unsafe fn from_raw(n_dim_index: TIndexer, values: Storage) -> Self {
         Self {
             values,
             n_dim_index,
         }
     }
 
-    pub fn unwrap_ref(&self) -> (&TIndexer, &Storage) {
+	/// Get ref of inner
+    pub fn inner(&self) -> (&TIndexer, &Storage) {
         (&self.n_dim_index, &self.values)
     }
 
-    pub fn unwrap_mut(&mut self) -> (&mut TIndexer, &mut Storage) {
+	/// Get mut ref of inner
+    pub unsafe fn inner_mut(&mut self) -> (&mut TIndexer, &mut Storage) {
         (&mut self.n_dim_index, &mut self.values)
     }
 
+	/// get [`TIndexer`][TNDimIndexer]
     pub fn n_dim_index(&self) -> &TIndexer {
         &self.n_dim_index
     }
 
+	/// get ref item by compressed
     pub fn get_with_compressed(&self, index: usize) -> Option<&T> {
         if !self.n_dim_index.contains_compressed(index) {
             return None;
         }
         Some(self.values.index(index))
     }
+	
+	/// get mut ref item by compressed
     pub fn get_mut_with_compressed(&mut self, index: usize) -> Option<&mut T> {
         if !self.n_dim_index.contains_compressed(index) {
             return None;
         }
         Some(self.values.index_mut(index))
     }
+	/// get ref [`Storage`]
     pub fn values(&self) -> &Storage {
         &self.values
     }
-    pub fn values_mut(&mut self) -> &mut Storage {
+	/// get mut ref [`Storage`]
+    pub unsafe fn values_mut(&mut self) -> &mut Storage {
         &mut self.values
     }
+	/// get mut ref [`Storage`] as [`IndexMut`]
+	pub fn values_mut_index(&mut self) -> &mut impl IndexMut<usize>{
+        &mut self.values
+	}
+	/// get with unsafe converting lifetime
     pub unsafe fn get_other<'a, 'b>(&'a self, indexes: &NDimIndex<DIM>) -> Option<&'b T> {
         self.get(indexes).map(|a| unsafe { &*(a as *const T) })
     }
+	/// get with unsafe converting lifetime
     pub unsafe fn get_mut_other<'a, 'b>(
         &'a mut self,
         indexes: &NDimIndex<DIM>,
@@ -724,7 +743,7 @@ mod test {
     #[test]
     fn test_ndim_array_bi_iter_mut() {
         // const ADIM:usize=3;
-        let andidx = NDimIndexer::new_len([0..3, 0..3, 0..3]);
+        let andidx = NDimIndexer::from_ranges([0..3, 0..3, 0..3]);
         let mut andarr = NDimArray::from_fn(&andidx, |idx| (idx, Vec::<NDimIndex<3>>::new()));
         andarr.iter_pair_mut_parallel(
             &|a, b, dim| {

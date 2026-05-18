@@ -1,7 +1,10 @@
+//! [NDimIndexEdgeIterator]
+
 use std::{array, ops::Deref};
 
 use crate::structures::n_dim_array::{dim_dir::DimDir, n_dim_index::NDimIndex, n_dim_index_operator::NDimIndexOperator, t_n_dim_indexer::TNDimIndexer};
 
+/// Iterating [`NDimIndex`] at edge
 #[derive(Debug,Clone,Copy)]
 pub struct NDimIndexEdgeIterator<const DIM:usize, TIndexer>{
 	operator:NDimIndexOperator<DIM,TIndexer>,
@@ -14,6 +17,7 @@ pub struct NDimIndexEdgeIterator<const DIM:usize, TIndexer>{
 impl<const DIM:usize, TIndexer> NDimIndexEdgeIterator<DIM,TIndexer> 
 	where TIndexer: Deref<Target : TNDimIndexer<DIM>>
 {
+	/// new
 	pub fn new(indexer:TIndexer,dim_dir:DimDir)->Self{
 		let dim=dim_dir.dim;
 		let dim_restricted=if dim_dir.dir_positive {

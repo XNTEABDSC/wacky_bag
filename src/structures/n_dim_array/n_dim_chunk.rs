@@ -1,7 +1,9 @@
+//! [get_chunk_dim_elem_count]
+
 use std::{any::Any, collections::HashMap, sync::{LazyLock, Mutex}};
 
 use crate::{structures::n_dim_array::{n_dim_array::NDimArray, n_dim_index::NDimIndex, n_dim_indexer_u::NDimIndexerU, t_n_dim_indexer::TNDimIndexer}, utils::dim_root_of_x_usize::get_dim_root_of_x_usize};
-
+/// [NDimArray] with pre calculated [`NDimIndexerU`]
 pub type NDimChunk<T,const  DIM:usize>=NDimArray<&'static NDimIndexerU<DIM>,DIM,T,Vec<T>>;
 
 // pub struct NDimChunk_<T,const DIM:usize>{
@@ -11,6 +13,7 @@ pub type NDimChunk<T,const  DIM:usize>=NDimArray<&'static NDimIndexerU<DIM>,DIM,
 
 static CACHED_N_DIM_INDEXER_U:LazyLock<Mutex<HashMap<(usize,usize),Box<dyn Any+Send>>>>=LazyLock::new(||Default::default());
 
+/// get_cached_n_dim_indexer_u
 pub fn get_cached_n_dim_indexer_u<const DIM:usize>(dim_elem_count:usize)->&'static NDimIndexerU<DIM>{
     let key=(DIM,dim_elem_count);
     let mut cached=CACHED_N_DIM_INDEXER_U.lock().unwrap();
@@ -23,7 +26,7 @@ pub fn get_cached_n_dim_indexer_u<const DIM:usize>(dim_elem_count:usize)->&'stat
     }
     else
     {
-        let res=Box::new(NDimIndexerU::new_len([dim_elem_count;DIM]));
+        let res=Box::new(NDimIndexerU::from_lens([dim_elem_count;DIM]));
         
         let res_in=cached.entry(key).or_insert(res);
         return unsafe {
@@ -53,17 +56,22 @@ pub fn get_cached_n_dim_indexer_u<const DIM:usize>(dim_elem_count:usize)->&'stat
 //     }
 // }
 
+/// for type `T`, `dim` and `chunk_size` 
+/// 
+/// calculates (items count at one dim , items count in a chunk) 
 pub fn get_chunk_dim_elem_count<T,const DIM:usize>(chunk_size:usize)->(usize,usize){
     let size_of_t=std::mem::size_of::<T>();
     let chunk_count=chunk_size/size_of_t;
     let (dim_elem_count,chunk_elem_count)=get_dim_root_of_x_usize(chunk_count,DIM);
     return (dim_elem_count,chunk_elem_count);
 }
-#[test]
-fn test(){
-	let (dim_elem_count,chunk_elem_count)=get_dim_root_of_x_usize(16*1024/16,2);
-}
+// #[cfg(test)]
+// #[test]
+// fn test(){
+// 	let (dim_elem_count,chunk_elem_count)=get_dim_root_of_x_usize(16*1024/16,2);
+// }
 
+/// get_cached_n_dim_indexer_u
 pub fn get_chunk_n_dim_indexer_u<T,const DIM:usize>(chunk_size:usize)->&'static NDimIndexerU<DIM>{
     let dim_elem_count=get_chunk_dim_elem_count::<T,DIM>(chunk_size).0;
     get_cached_n_dim_indexer_u::<DIM>(dim_elem_count)
@@ -72,6 +80,7 @@ pub fn get_chunk_n_dim_indexer_u<T,const DIM:usize>(chunk_size:usize)->&'static 
 /// 32KB
 pub const COMMON_CHUNK_SIZE:usize=32*1024;
 
+/// [`NDimChunk`]
 pub fn from_fn<T,const DIM:usize,Func>(mut f:Func,chunk_size:usize)->NDimChunk<T,DIM>
 	where Func:FnMut(NDimIndex<DIM>)->T
 {
@@ -79,7 +88,7 @@ pub fn from_fn<T,const DIM:usize,Func>(mut f:Func,chunk_size:usize)->NDimChunk<T
 
 	let values=Vec::from_iter(indexer.iter().map(|idx|f(idx)));//Vec::from_iter();
 	
-	NDimArray::new(indexer, values)
+	unsafe {NDimArray::from_raw(indexer, values)}
 }
 
 // impl<T,const DIM:usize> NDimChunk_<T,DIM> {

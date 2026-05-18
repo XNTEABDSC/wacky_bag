@@ -1,8 +1,10 @@
+//! [NDimIndexIter]
+
 use std::{array, ops::{ControlFlow, Deref, Range}};
 
 use crate::structures::n_dim_array::n_dim_index::NDimIndex;
 
-
+/// Iterating [`NDimIndex`]
 #[derive(Debug,Clone,Copy)]
 pub struct NDimIndexIter<const DIM:usize,Lens> {
     lens:Lens,
@@ -13,6 +15,7 @@ pub struct NDimIndexIter<const DIM:usize,Lens> {
 impl<const DIM:usize,Lens> NDimIndexIter<DIM,Lens> 
 	where Lens:Deref<Target = [Range<isize>;DIM]>,
 {
+	/// new
     pub fn new(lens:Lens)->Self{Self{cur:array::from_fn(|i|(*lens)[i].start),lens,ended:false}}
 }
 

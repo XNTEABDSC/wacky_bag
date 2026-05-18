@@ -1,3 +1,6 @@
+//! [`range_inclusive_convert_cover`]
+
+
 use std::ops::{RangeInclusive};
 
 /// convert \[l:`Num`,r:`Num`\] to \[li:`isize`,ri:`isize`\]

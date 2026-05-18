@@ -1,4 +1,4 @@
-
+//! [`HMappableFrom`]
 use frunk::{Func, HCons, HNil, Poly};
 
 use crate::utils::type_fn::BijectiveTypeFunc;
@@ -13,7 +13,9 @@ use crate::utils::type_fn::BijectiveTypeFunc;
 /// 
 /// requires `OutputMapper` to implement [BijectiveTypeFunc]
 pub trait HMappableFrom<OutputMapper> {
+	/// type of input which will be mapped to output (self)
 	type Input;
+	/// map input to output
 	fn output_map(input:Self::Input,mapper:OutputMapper)->Self;
 }
 

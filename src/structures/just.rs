@@ -1,6 +1,8 @@
+//! [Owned]
+
 use std::ops::{Deref, DerefMut};
 
-
+/// A type acts like [`Deref`] smart pointers, but just own the value. allowing better generic usage.
 #[derive(Debug, Clone, Copy)]
 pub struct Owned<T>(pub T);
 

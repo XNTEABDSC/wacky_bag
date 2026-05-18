@@ -1,5 +1,7 @@
-use std::ops::{AddAssign, RangeBounds, SubAssign};
+//! [loop_wrap]
 
+use std::ops::{AddAssign, RangeBounds, SubAssign};
+/// loop_wrap_assign
 pub fn loop_wrap_assign<T,TRange,T2>(value:&mut T,range:&TRange,len:T2)->isize
     where T:AddAssign<T2>+SubAssign<T2>+Ord,
 	TRange:RangeBounds<T>,
@@ -39,7 +41,7 @@ pub fn loop_wrap_assign<T,TRange,T2>(value:&mut T,range:&TRange,len:T2)->isize
 	}
 	return i;
 }
-
+/// loop_wrap
 pub fn loop_wrap<T,TRange,T2>(mut value:T,range:&TRange,len:T2)->T
     where T:AddAssign<T2>+SubAssign<T2>+Ord,TRange:RangeBounds<T>,T2:Copy
 {

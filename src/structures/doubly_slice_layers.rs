@@ -1,3 +1,6 @@
+// not docing things that is not important (not used and may be even I forgot what they does)
+#![allow(missing_docs)]
+
 use std::ops::{Range, RangeInclusive};
 
 use crate::utils::range_inclusive_upper_convert::range_inclusive_convert_cover;

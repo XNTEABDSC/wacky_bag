@@ -1,3 +1,5 @@
+//! type fn
+
 use std::marker::PhantomData;
 
 use frunk::Func;
@@ -6,6 +8,7 @@ use frunk::Func;
 /// 
 /// auto impl TypeFunc for F:[Func]
 pub trait TypeFunc<Input>{
+	/// `Output` type
 	type Output;
 }
 
@@ -30,6 +33,7 @@ pub trait TypeFunc<Input>{
 /// 
 /// auto impl TypeFunc for F:[BijectiveFunc]
 pub trait BijectiveTypeFunc<Output> : TypeFunc<Self::Input,Output = Output> {
+	/// `Input` type
 	type Input;
 }
 
@@ -42,7 +46,9 @@ pub trait BijectiveTypeFunc<Output> : TypeFunc<Self::Input,Output = Output> {
 
 /// Shows how to find Input via Output
 pub trait BijectiveFunc<Output> : Func<Self::Input,Output = Output> {
+	/// `Input` type
 	type Input;
+	/// from `Output` to `Input`
 	fn inv_call(output:Output)->Self::Input;
 }
 /// reverse the function if it is bijective
@@ -123,7 +129,7 @@ impl<F1,F2,V1,V2,V3> BijectiveFunc<V3> for ChainFunc<F1,F2>
 		F1::inv_call(F2::inv_call(output))
 	}
 }
-
+/// use [`Func`] and [`BijectiveFunc`] as [`TypeFunc`] and [`BijectiveTypeFunc`]
 pub struct FuncAsTypeFunc<F>(pub F);
 
 impl<T,I,O> TypeFunc<I> for FuncAsTypeFunc<T>
@@ -168,7 +174,7 @@ impl<T,I,O> BijectiveFunc<PhantomData<O>> for TypeFnAsPhantomFn<T>
 /// PANICS WHEN USED IN [frunk::HCons::map] AS `mapper`
 /// 
 /// impl [Func] is provided only to make use of hlist functions type expression but NOT value calculating.
-#[derive(Debug,Default,Clone, Copy)]
+#[derive(Debug,Clone, Copy)]
 pub struct MapFromPhantomPanic;
 
 impl<T> Func<PhantomData<T>> for MapFromPhantomPanic {
@@ -186,5 +192,5 @@ impl<T> BijectiveFunc<T> for MapFromPhantomPanic {
 		Default::default()
 	}
 }
-
+/// [`MapFromPhantomPanic`]
 pub type MapPhantomType=MapFromPhantomPanic;

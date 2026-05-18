@@ -1,3 +1,6 @@
+// not docing things that is not important (not used and may be even I forgot what they does)
+#![allow(missing_docs)]
+
 use std::{array, ops::{Range, RangeInclusive}};
 
 use crate::{structures::{doubly_slice_layers::{DoublySliceIndex, doubly_slice_layers_overlap, find_range_at_doubly_slice_i}, just::Owned, n_dim_array::{n_dim_array::NDimArray, n_dim_indexer::NDimIndexer, t_n_dim_array::TNDimArray}}, utils::range_inclusive_upper_convert::range_inclusive_convert_cover};
@@ -22,7 +25,7 @@ impl<T,const DIM:usize> DoublyGridLayers<DIM,T> {
         let mut res=Self { values };
         
         loop {
-            let indexer=NDimIndexer::new_len(lens.clone().map(|v|{
+            let indexer=NDimIndexer::from_ranges(lens.clone().map(|v|{
                 let inner=v.into_inner();
                 inner.0..(inner.1+1)
             }));

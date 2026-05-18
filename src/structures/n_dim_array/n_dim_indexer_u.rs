@@ -1,15 +1,19 @@
+//! [NDimIndexerU]
+
 use std::{array, ops::{ControlFlow, Deref}};
 
 use crate::structures::{just::Owned, n_dim_array::{n_dim_index_u::NDimIndexU, t_n_dim_indexer::TNDimIndexer}};
 
+use super::n_dim_index::NDimIndex;
 
+/// convert between [`NDimIndexU`] / [`NDimIndex`] and compressed usize
 #[derive(Debug,Clone)]
 pub struct NDimIndexerU<const DIM:usize>{
     steps:[usize;DIM],
     length:usize,
     lens:[usize;DIM],
 }
-
+/// iterates all [`NDimIndex`] and compressed usize of a [`NDimIndexerU`]
 #[derive(Debug,Clone)]
 pub struct NDimIndexUIter<'a,const DIM:usize>{
     lens:&'a [usize;DIM],
@@ -18,6 +22,7 @@ pub struct NDimIndexUIter<'a,const DIM:usize>{
 }
 
 impl<'a,const DIM:usize> NDimIndexUIter<'a,DIM> {
+	/// create [`NDimIndexUIter`]
     pub fn new(lens:&'a [usize;DIM])->Self{Self{lens,cur:[0;DIM],ended:false}}
 }
 
@@ -60,7 +65,7 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexerU<DIM> {
 		&self.steps
 	}
 
-	fn contains(&self,indexes:&super::n_dim_index::NDimIndex<DIM>)->bool {
+	fn contains(&self,indexes:&NDimIndex<DIM>)->bool {
 		self.lens.iter().zip(indexes.iter()).try_for_each(|(l,a)|{
 			if (*a) < (*l as isize) {
 				return ControlFlow::Continue(());
@@ -74,15 +79,15 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexerU<DIM> {
 		index<self.length
 	}
 
-	fn compress_index(&self,indexes:&super::n_dim_index::NDimIndex<DIM>)->usize {
+	fn compress_index(&self,indexes:&NDimIndex<DIM>)->usize {
 		self.compress_index_u(indexes.map(|a|a as usize))
 	}
 
-	fn decompress_index(&self,compressed_index:usize)->super::n_dim_index::NDimIndex<DIM> {
+	fn decompress_index(&self,compressed_index:usize)->NDimIndex<DIM> {
 		self.decompress_index_u(compressed_index).map(|a|a as isize)
 	}
 
-	fn iter<'a>(&'a self)->impl Iterator<Item=super::n_dim_index::NDimIndex<DIM>> + 'a {
+	fn iter<'a>(&'a self)->impl Iterator<Item=NDimIndex<DIM>> + 'a {
 		self.iter_u().map(|a|a.map(|b|b as isize))
 	}
 	
@@ -118,11 +123,17 @@ impl<const DIM:usize> TNDimIndexer<DIM> for NDimIndexerU<DIM> {
 }
 
 impl<const DIM:usize> NDimIndexerU<DIM>{
-    pub fn lens(&self)->&[usize;DIM]{&self.lens}
-    pub fn bases(&self)->&[usize;DIM]{&self.steps}
-    pub fn length(&self)->usize{self.length}
+	/// lens
+    pub fn lens_u(&self)->&[usize;DIM]{&self.lens}
+	/// steps
+    pub fn steps_u(&self)->&[usize;DIM]{&self.steps}
+	/// length
+    pub fn length_u(&self)->usize{self.length}
 
-    pub fn new_len(lens:[usize;DIM])->Self{
+	/// Create [NDimIndexUIter] from lens of each dim.
+	/// 
+	/// the range of [`NDimIndex`] is 0..lens
+    pub fn from_lens(lens:[usize;DIM])->Self{
         let mut steps=[0usize;DIM];
         let mut cur_length:usize=1;
         for i in (0..DIM).rev() {
@@ -133,6 +144,7 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
         Self{steps,length:cur_length,lens}
     }
 
+	/// check whether [`NDimIndexU`] is inside
 	pub fn contains_u(&self,indexes:NDimIndexU<DIM>)->bool{
 		self.lens.iter().zip(indexes.iter()).try_for_each(|(l,a)|{
 			if a<l {
@@ -143,6 +155,7 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
 		}).is_continue()
 	}
 
+	/// converts [`NDimIndexU`] to compressed [`usize`]
     pub fn compress_index_u(&self,indexes:NDimIndexU<DIM>)->usize{
         let mut res=0;
         for i in 0..DIM {
@@ -150,7 +163,7 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
         }
         res
     }
-    /* */
+    /// compressed [`usize`] to converts [`NDimIndex`] 
     pub fn decompress_index_u(&self,mut compressed_index:usize)->NDimIndexU<DIM>{
         array::from_fn(|i|{
             let step=self.lens[i];
@@ -159,6 +172,7 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
             rem
         })
     }
+	/// [`NDimIndexUIter`]
     pub fn iter_u<'a>(&'a self)->NDimIndexUIter<'a,DIM> {
         NDimIndexUIter::new(&self.lens)
     }
@@ -166,14 +180,14 @@ impl<const DIM:usize> NDimIndexerU<DIM>{
 
 #[test]
 fn test() {
-    let a_compress_index=NDimIndexerU::new_len([10,10,10]);
+    let a_compress_index=NDimIndexerU::from_lens([10,10,10]);
     let a_compresss_1=a_compress_index.compress_index_u([1,2,3]);
     assert_eq!(a_compresss_1,321);//println!("{}",a_compresss_1);
 
     let a_seperated=a_compress_index.decompress_index_u(a_compresss_1);
     assert_eq!(a_seperated,[1,2,3]);//println!("{:?}",a_seperated);
 
-    let b_compress_index=NDimIndexerU::new_len([1,2,3]);
+    let b_compress_index=NDimIndexerU::from_lens([1,2,3]);
     let b_compress_index_iter=b_compress_index.iter_u();
     assert_eq!(b_compress_index_iter.collect::<Vec<[usize;3]>>(),vec![
         [0, 0, 0],

@@ -1,3 +1,7 @@
+// not docing things that is not important (not used and may be even I forgot what they does)
+#![allow(missing_docs)]
+
+/// used for a pattern but not used
 #[macro_export]
 macro_rules! make_nt_deref {
     ($name_type:ident,$name_trait:ident,$name_method:ident) => {
@@ -6,14 +10,16 @@ macro_rules! make_nt_deref {
 pub struct $name_type<TRef,TValue>(pub TRef,std::marker::PhantomData<TValue>);
 
 impl<TRef,TValue> $name_type<TRef,TValue> {
+	/// new
     pub fn new(a:TRef)->Self {
         Self(a, Default::default())
     }
 }
-
+/// to convert a reference into $name_type
 pub trait $name_trait<TValue>
     where Self:std::ops::Deref<Target = TValue>+Sized
 {
+	/// convert the reference into $name_type
     fn $name_method(self)->$name_type<Self,TValue>;
 }
 

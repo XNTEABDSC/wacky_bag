@@ -1,3 +1,5 @@
+//! [`d_sphere_volume_c`]
+
 use std::{collections::HashMap, sync::{LazyLock, RwLock}};
 
 use simba::scalar::RealField;
@@ -8,6 +10,8 @@ use crate::{collections::type_map::TypeMap, utils::{factorial::gamma_n_timed_2, 
 
 static D_SPHERE_MEASURE:LazyLock<RwLock< TypeMap >>=LazyLock::new(||Default::default());
 
+
+/// calculates measure/factor of N dim sphere
 pub fn d_sphere_measure<Num:RealField+Clone>(dim:usize)->Result<
 Num,
 RwLockErrorEither<'static,TypeMap>
@@ -46,16 +50,18 @@ RwLockErrorEither<'static,TypeMap>
 	// let d_sphere_measure
 }
 
+/// calculates volume of N dim sphere by `radius.pow(dim)`
 pub fn d_sphere_volume_by_radius_pow<Num:RealField>(radius_pow:Num,dim:usize)->Num{
 	d_sphere_measure::<Num>(dim).unwrap()*radius_pow
 }
 
+/// calculates volume of N dim sphere
 pub fn d_sphere_volume_c<Num:RealField+Clone,const DIM:usize>(radius:Num)->Num{
 	d_sphere_measure::<Num>(DIM).unwrap()*radius.powi(DIM as i32)
 }
 
 #[cfg(test)]
-pub mod test{
+mod test{
 
 	use core::f32;
 

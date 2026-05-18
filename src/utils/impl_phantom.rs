@@ -1,4 +1,6 @@
+//! [`impl_phantom`]
 
+/// impl Debug, Hash, Eq, Clone, Default for `struct bla<T>(PhantomType<T>)`
 #[macro_export]
 macro_rules! impl_phantom {
 	($SystemSet:ident) => {
