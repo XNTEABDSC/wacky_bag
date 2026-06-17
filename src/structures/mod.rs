@@ -8,7 +8,7 @@ pub mod idtrait;
 pub mod doubly_grid_layers;
 // pub mod cached_iter;
 pub mod doubly_slice_layers;
-pub mod just;
+pub mod owned;
 
 pub mod n_dim_array;
 // pub mod n_dim_index_2;

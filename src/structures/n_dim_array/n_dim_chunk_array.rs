@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::structures::{
-    just::Owned,
+    owned::Owned,
     n_dim_array::{
         n_dim_array::NDimArray,
         n_dim_index::NDimIndex,

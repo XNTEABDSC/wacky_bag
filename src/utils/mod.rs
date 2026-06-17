@@ -16,6 +16,8 @@ pub mod h_extend_by_fn;
 pub mod factorial;
 pub mod d_sphere_volume;
 pub mod rw_lock_error_either;
+pub mod h_h_zippable;
+pub mod phantom_data_type_params;
 
 
 // use crate::collections::raw_vec::RawVec;
@@ -25,4 +27,9 @@ pub mod rw_lock_error_either;
 //     list[index]=elem;
 // }
 
-
+/// showing that F is `impl FnOnce(I)->O`
+pub fn restrict_fn_once_type<F,I,O>(f:F)->F
+where F:FnOnce(I)->O
+{
+	f
+}

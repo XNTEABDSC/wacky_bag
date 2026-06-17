@@ -1,6 +1,6 @@
 //! type fn
 
-use std::marker::PhantomData;
+use std::{any::type_name, marker::PhantomData};
 
 use frunk::Func;
 
@@ -169,19 +169,30 @@ impl<T,I,O> BijectiveFunc<PhantomData<O>> for TypeFnAsPhantomFn<T>
 	}
 }
 
+// crate::new_struct_func!{
+// 	#[doc= "`PhantomData<T>` to `T` and should only be used as type wrapping.\n "]
+// 	pub MapFromPhantomPanic
+// 	impl<T>:
+// 	(PhantomData<T>) <-> (T)
+// 	|_i|panic!("{:?} should not be called, but only used in type expression, cant get {} from PhantomData<{}>",MapFromPhantomPanic,type_name::<T>(),type_name::<T>()),
+// 	|_i|Default::default()
+// }
+
 /// `PhantomData<T>` to `T` and should only be used as type wrapping.
 /// 
-/// PANICS WHEN USED IN [frunk::HCons::map] AS `mapper`
-/// 
 /// impl [Func] is provided only to make use of hlist functions type expression but NOT value calculating.
-#[derive(Debug,Clone, Copy)]
-pub struct MapFromPhantomPanic;
+/// 
+/// # Panic
+/// 
+/// Panics when used in [frunk::HCons::map] as `mapper`
+#[derive(Debug)]
+pub struct MapFromPhantomPanic(());
 
 impl<T> Func<PhantomData<T>> for MapFromPhantomPanic {
 	type Output=T;
 
 	fn call(_i: PhantomData<T>) -> Self::Output {
-		panic!("{:?} should not be called, but only used in type expression",MapFromPhantomPanic)
+		panic!("{:?} should not be called, but only used in type expression, cant get {} from PhantomData<{}>",MapFromPhantomPanic(()),type_name::<T>(),type_name::<T>())
 	}
 }
 
@@ -194,3 +205,172 @@ impl<T> BijectiveFunc<T> for MapFromPhantomPanic {
 }
 /// [`MapFromPhantomPanic`]
 pub type MapPhantomType=MapFromPhantomPanic;
+
+/**
+impl [`TypeFunc`] [`BijectiveTypeFunc`] [`Func`] [`BijectiveFunc`] by a easy way.
+
+see [`new_struct_func`]
+*/
+#[macro_export]
+macro_rules! impl_func {
+( $(< $($g:tt),+ >)? for $name:ty $({ where $($where:tt)+ })? : ($a:ty) <-> ($b:ty) $a2b:expr) => {
+	$crate::impl_func!{$(< $($g),+ >)? for $name $({where $($where)+})? : ($a) <-> ($b)}
+	impl $(< $($g),+ >)? frunk::traits::Func<$a> for $name
+	$(where $($where)+)?
+	{
+		type Output=$b;
+		fn call(i:$a)->Self::Output{
+			let f=$crate::utils::restrict_fn_once_type::<_,$a,$b>($a2b);// WHAT HAPPENED WHY ITS NOT REPLACED
+			f(i)
+		}
+	}
+};
+($(< $($g:tt),+ >)?for $name:ty $({ where $($where:tt)+ })? : ($a:ty) <-> ($b:ty) ) => {
+	$crate::impl_func!{$(< $($g),+ >)? for $name $({where $($where)+})? : ($a) -> ($b)}
+	impl$(< $($g),+ >)? $crate::utils::type_fn::BijectiveTypeFunc<$b> for $name
+	$(where $($where)+)?
+	{
+		type Input=$a;
+	}
+};
+($(< $($g:tt),+ >)? for $name:ty $({ where $($where:tt)+ })? : ($a:ty) <-> ($b:ty) $a2b:expr,$b2a:expr) => {
+	$crate::impl_func!{$(< $($g),+ >)? for $name $({where $($where)+})? : ($a) <-> ($b) $a2b}
+	impl$(< $($g),+ >)? $crate::utils::type_fn::BijectiveFunc<$b> for $name
+	$(where $($where)+)?
+	{
+		type Input=$a;
+		fn inv_call(o:$b)->Self::Input{
+			let f=$crate::utils::restrict_fn_once_type::<_,$b,$a>($b2a);
+			f(o)
+		}
+	}
+};
+($(< $($g:tt),+ >)? for $name:ty $({ where $($where:tt)+ })? : ($a:ty) -> ($b:ty) $a2b:expr) => {
+	$crate::impl_func!{$(< $($g),+ >)? for $name $({where $($where)+})? : ($a) -> ($b)}
+	impl$(< $($g),+ >)? frunk::traits::Func<$a> for $name
+	$(where $($where)+)?
+	{
+		type Output=$b;
+		fn call(i:$a)->Self::Output{
+			let f=$crate::utils::restrict_fn_once_type::<_,$a,$b>($a2b);// WHAT HAPPENED WHY ITS NOT REPLACED
+			f(i)
+		}
+	}
+};
+($(< $($g:tt),+ >)? for $name:ty $({ where $($where:tt)+ })? : ($a:ty) $a2b:expr) => {
+	$crate::impl_func!{$(< $($g),+ >)? for $name $({where $($where)+})? : ($a) -> (()) $a2b}
+};
+($(< $($g:tt),+ >)? for $name:ty $({ where $($where:tt)+ })? : ($a:ty) -> ($b:ty) ) => {
+	impl$(< $($g),+ >)? $crate::utils::type_fn::TypeFunc<$a> for $name
+	$(where $($where)+)?
+	{
+		type Output=$b;
+	}
+};
+}
+
+/**
+creates a new type that impl [`TypeFunc`] [`BijectiveTypeFunc`] [`Func`] [`BijectiveFunc`]
+
+# Example
+```
+# use wacky_bag::new_struct_func;
+# use std::marker::PhantomData;
+new_struct_func!(
+	pub MapToPhantom // name, can have <T>
+	impl<T> // impl with generic parameter, can add where clause inside a {}
+	:
+	(T) <-> (PhantomData<T>) // input output type, -> is one side, <-> is bijective
+	|_i|Default::default() // FnOnce(T)->PhantomData<T>
+	// |_p|panic!() // BijectiveFunc if you want
+);
+```
+another 
+```
+# use std::iter::Chain;
+# use wacky_bag::new_struct_func;
+new_struct_func!(
+	pub FoldChainIter impl <Acc,X,Item>
+	{where Acc:Iterator<Item = Item>,
+		X:Iterator<Item = Item>}
+	:
+	((Acc,X)) <-> (Chain<Acc,X>)
+	|i|i.0.chain(i.1)
+);
+```
+
+# Problem
+
+you cant use lifetime param at impl if you have type param at struct because "lifetime param must before type param"
+
+there is a weird bug about lifetime and ty capturing.
+*/
+#[macro_export]
+macro_rules! new_struct_func {
+
+($(#[$meta:meta])* $vis:vis $name:ident impl $(< $($i_g:tt),+ >)? $( { where $($where:tt)+ })?: $($then:tt)* ) => {
+	$(#[$meta])*
+
+	#[doc = stringify!( < $($($i_g),*)? > for $name 
+
+	$({where $($where)+})?: 
+
+	$($then)* )]
+	#[derive(Debug,Default,Clone,Copy)]
+	$vis struct $name;
+
+	$crate::impl_func!{ $(< $($i_g),+ >)? for $name $({where $($where)+})?: $($then)* }
+};
+
+($(#[$meta:meta])* $vis:vis $name:ident < $($g:tt),+ >  impl $(< $($i_g:tt),+ >)? $( { where $($where:tt)+ })?: $($then:tt)* ) => {
+	$(#[$meta])*
+
+	#[doc = stringify!( < $($g),* , $($($i_g),*)? > for $name<$($g),*> 
+
+	$({where $($where)+})?: 
+
+	$($then)* )]
+	$vis struct $name< $($g),* >(pub PhantomData< $crate::phantom_data_type_params!($($g),*) >);
+
+	$crate::impl_phantom!{$name< $($g),* >}
+
+	$crate::impl_func!{ < $($g),* , $($($i_g),*)? > for $name<$($g),*> $({where $($where)+})?: $($then)* }
+	};
+
+}
+
+
+/**
+# Example
+```
+# use wacky_bag::impl_func_clause;
+# use frunk::{Poly, hlist};
+let func=impl_func_clause!(: (i32) -> (i32) |i|i+1);
+assert_eq!(
+	hlist![1,2,3,4].map(Poly(func)),
+	hlist![2,3,4,5]
+);
+```
+ */
+#[macro_export]
+macro_rules! impl_func_clause {
+($($tt:tt)* ) => {
+	{
+		$crate::new_struct_func!(ImplFuncClause impl $($tt)*);
+		ImplFuncClause
+	}
+};
+}
+#[cfg(test)]
+mod test{
+    use frunk::{Poly, hlist};
+
+	#[test]
+	fn test_impl_func_clause(){
+		let func=impl_func_clause!(: (i32) -> (i32) |i|i+1);
+		assert_eq!(
+			hlist![1,2,3,4].map(Poly(func)),
+			hlist![2,3,4,5]
+		);
+	}
+}

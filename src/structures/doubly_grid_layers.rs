@@ -3,7 +3,7 @@
 
 use std::{array, ops::{Range, RangeInclusive}};
 
-use crate::{structures::{doubly_slice_layers::{DoublySliceIndex, doubly_slice_layers_overlap, find_range_at_doubly_slice_i}, just::Owned, n_dim_array::{n_dim_array::NDimArray, n_dim_indexer::NDimIndexer, t_n_dim_array::TNDimArray}}, utils::range_inclusive_upper_convert::range_inclusive_convert_cover};
+use crate::{structures::{doubly_slice_layers::{DoublySliceIndex, doubly_slice_layers_overlap, find_range_at_doubly_slice_i}, owned::Owned, n_dim_array::{n_dim_array::NDimArray, n_dim_indexer::NDimIndexer, t_n_dim_array::TNDimArray}}, utils::range_inclusive_upper_convert::range_inclusive_convert_cover};
 pub struct DoublyGridIndex<const DIM:usize>{
     pub layer:isize,pub pos:[isize;DIM]
 }
