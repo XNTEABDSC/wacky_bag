@@ -1,4 +1,8 @@
-
+//! [`phantom_data_type_params`]
+/// generates generic parameter for PhantomData
+/**
+`PhantomData< phantom_data_type_params!('static,'static, i32,i64) >`
+*/
 #[macro_export]
 macro_rules! phantom_data_type_params{
 	($lt:lifetime)=>{&$lt ()};
@@ -10,15 +14,6 @@ macro_rules! phantom_data_type_params{
 		($ty, $crate::phantom_data_type_params!($($tt),*))
 	};
 	
-}
-
-
-#[macro_export]
-macro_rules! ttttest{
-
-	// ($($lt:lifetime)+ $($ty:ty)*)=>{f32};
-	($ty:ty)=>{i32};
-	($lt:lifetime)=>{i64};
 }
 #[cfg(test)]
 mod test{

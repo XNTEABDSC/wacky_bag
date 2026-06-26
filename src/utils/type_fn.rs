@@ -345,10 +345,11 @@ macro_rules! new_struct_func {
 ```
 # use wacky_bag::impl_func_clause;
 # use frunk::{Poly, hlist};
-let func=impl_func_clause!(: (i32) -> (i32) |i|i+1);
+# use std::ops::Add;
+let func=impl_func_clause!(<T>{where T:Add<T>+Clone}: (T) -> (<T as Add<T>>::Output) |i|i.clone()+i);
 assert_eq!(
-	hlist![1,2,3,4].map(Poly(func)),
-	hlist![2,3,4,5]
+	hlist![1,2.0,3usize].map(Poly(func)),
+	hlist![2,4.0,6usize]
 );
 ```
  */
@@ -361,16 +362,85 @@ macro_rules! impl_func_clause {
 	}
 };
 }
+/// [`Func`] for `pub Name<T>(pub T);`
+#[macro_export]
+macro_rules! new_new_type_func {
+	($nt_name:ident 
+		$($once_fn_name_vis:vis $once_fn_name:ident)? 
+		$(ref $ref_fn_name_vis:vis $ref_fn_name:ident)?
+		$(mut $mut_fn_name_vis:vis $mut_fn_name:ident)?
+	) => {
+		$(
+			$crate::new_struct_func!{
+				$once_fn_name_vis $once_fn_name
+				impl<T>:
+				(T)<->($nt_name<T>)
+				|i|$nt_name(i),
+				|i|i.0
+			}
+		)?
+		$(
+			$crate::new_struct_func!{
+				$ref_fn_name_vis $ref_fn_name
+				impl<'a,T>:
+				(&'a $nt_name<T>)<->(&'a T)
+				|i|&i.0
+			}
+		)?
+		$(
+			$crate::new_struct_func!{
+				$mut_fn_name $mut_fn_name
+				impl<'a,T>:
+				(&'a mut $nt_name<T>)<->(&'a mut T)
+				|i|&mut i.0
+			}
+		)?
+	};
+}
+/// [`Func`] for `pub Name<T>(PhantomData<T>);`
+#[macro_export]
+macro_rules! new_new_phantom_type_func {
+	($nt_name:ident $vis:vis $fn_name:ident ) => {
+		$crate::new_struct_func!(
+			$vis $fn_name
+			impl<T>:
+			(T)<->($nt_name<T>)
+			|_|Default::default()
+		);
+	};
+}
 #[cfg(test)]
 mod test{
-    use frunk::{Poly, hlist};
+    use std::{marker::PhantomData, ops::{Add, AddAssign}};
+
+use frunk::{Func, HList, Poly, hlist};
+
+use crate::utils::{default_of::default, h_list_helpers::HMapP, type_fn::BijectiveFunc};
 
 	#[test]
 	fn test_impl_func_clause(){
-		let func=impl_func_clause!(: (i32) -> (i32) |i|i+1);
+		let func=impl_func_clause!(<T>{where T:Add<T>+Clone}: (T) -> (<T as Add<T>>::Output) |i|i.clone()+i);
 		assert_eq!(
-			hlist![1,2,3,4].map(Poly(func)),
-			hlist![2,3,4,5]
+			hlist![1,2.0,3usize].map(Poly(func)),
+			hlist![2,4.0,6usize]
 		);
 	}
+	struct NTA<T>(pub T);
+	new_new_type_func!(NTA MapNTA ref MapNTARef);
+	struct NTB<T>(PhantomData<T>);
+
+	impl<T> Default for NTB<T> {
+		fn default() -> Self {
+			Self(Default::default())
+		}
+	}
+	new_new_phantom_type_func!(NTB MapNTB);
+
+	#[test]
+	fn test_new_new_type() {
+		let a=MapNTA::call(1);
+		assert_eq!(MapNTARef::call(&a),&1);
+		let _b:HList!(NTB<i32>,NTB<i64>)=default::<HMapP<HList!(i32,i64),MapNTB>>();
+	}
+
 }
