@@ -44,7 +44,7 @@ mod test{
 
 use frunk::{HList, Poly, hlist, hlist_pat};
 
-use crate::{impl_func_clause, new_new_type_func, new_struct_func, utils::{output_func::HMappableFrom, type_fn::ReverseFunc}};
+use crate::{impl_func_closure, new_new_type_func, new_struct_func, utils::{output_func::HMappableFrom, type_fn::ReverseFunc}};
 
 	struct NTS<T>(pub T);
 	new_new_type_func!(NTS MapS);

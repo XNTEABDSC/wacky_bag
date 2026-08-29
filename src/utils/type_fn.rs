@@ -343,10 +343,10 @@ macro_rules! new_struct_func {
 /**
 # Example
 ```
-# use wacky_bag::impl_func_clause;
+# use wacky_bag::impl_func_closure;
 # use frunk::{Poly, hlist};
 # use std::ops::Add;
-let func=impl_func_clause!(<T>{where T:Add<T>+Clone}: (T) -> (<T as Add<T>>::Output) |i|i.clone()+i);
+let func=impl_func_closure!(<T>{where T:Add<T>+Clone}: (T) -> (<T as Add<T>>::Output) |i|i.clone()+i);
 assert_eq!(
 	hlist![1,2.0,3usize].map(Poly(func)),
 	hlist![2,4.0,6usize]
@@ -354,7 +354,7 @@ assert_eq!(
 ```
  */
 #[macro_export]
-macro_rules! impl_func_clause {
+macro_rules! impl_func_closure {
 ($($tt:tt)* ) => {
 	{
 		$crate::new_struct_func!(ImplFuncClause impl $($tt)*);
@@ -418,8 +418,8 @@ use frunk::{Func, HList, Poly, hlist};
 use crate::utils::{default_of::default, h_list_helpers::HMapP, type_fn::BijectiveFunc};
 
 	#[test]
-	fn test_impl_func_clause(){
-		let func=impl_func_clause!(<T>{where T:Add<T>+Clone}: (T) -> (<T as Add<T>>::Output) |i|i.clone()+i);
+	fn test_impl_func_closure(){
+		let func=impl_func_closure!(<T>{where T:Add<T>+Clone}: (T) -> (<T as Add<T>>::Output) |i|i.clone()+i);
 		assert_eq!(
 			hlist![1,2.0,3usize].map(Poly(func)),
 			hlist![2,4.0,6usize]

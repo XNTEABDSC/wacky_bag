@@ -10,7 +10,7 @@ edition = "2024"
 # my_tuple={path="../my_tuple"}
 # lazy_static = "1.5.0"
 wacky_bag_macro = { path = "./wacky_bag_macro" }
-frunk = "0.4.4"
+frunk = "0.5.0"
 simba = "0.9.1"
 num-traits = "0.2.19"
 either = "1.15.0"
