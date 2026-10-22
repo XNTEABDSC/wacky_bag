@@ -19,8 +19,9 @@ macro_rules! phantom_data_type_params{
 mod test{
 	use std::marker::PhantomData;
 
+	#[test]
 	fn test(){
-		let a:PhantomData< phantom_data_type_params!('static,'static) >;
-		let b:PhantomData< phantom_data_type_params!('static,'static, i32,i64) >;
+		let _a:PhantomData< phantom_data_type_params!('static,'static) >;
+		let _b:PhantomData< phantom_data_type_params!('static,'static, i32,i64) >;
 	}
 }

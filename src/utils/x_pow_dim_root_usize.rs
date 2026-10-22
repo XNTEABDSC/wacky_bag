@@ -64,10 +64,10 @@ impl Default for DimRootOfXUsize {
 }
 //static mut DIM_ROOT_OF_X_USIZE:LazyLock<Arc<Mutex<DimRootOfXUsize>>>=LazyLock::new(||Default::default());
 
-static DIM_ROOT_OF_X_USIZE:LazyLock< Mutex<DimRootOfXUsize> > = LazyLock::new(|| Default::default());
-/// dim_root = (x ^ (1/dim)) . floor()
-/// Returns (dim_root,dim_root^dim)
-pub fn get_dim_root_of_x_usize(x:usize,dim:usize)->(usize,usize) {
+static X_POW_DIM_ROOT_USIZE:LazyLock< Mutex<DimRootOfXUsize> > = LazyLock::new(|| Default::default());
+/// x_pow_dim_root = floor(x ^ (1/dim)) . 
+/// Returns ( x_pow_dim_root , x_pow_dim_root^dim )
+pub fn x_pow_dim_root_usize(x:usize,dim:usize)->(usize,usize) {
 	
-    DIM_ROOT_OF_X_USIZE.lock().unwrap().get( x, dim)
+    X_POW_DIM_ROOT_USIZE.lock().unwrap().get( x, dim)
 }

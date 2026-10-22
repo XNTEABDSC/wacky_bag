@@ -2,7 +2,7 @@
 
 use std::{any::Any, collections::HashMap, sync::{LazyLock, Mutex}};
 
-use crate::{structures::n_dim_array::{n_dim_array::NDimArray, n_dim_index::NDimIndex, n_dim_indexer_u::NDimIndexerU, t_n_dim_indexer::TNDimIndexer}, utils::dim_root_of_x_usize::get_dim_root_of_x_usize};
+use crate::{structures::n_dim_array::{n_dim_array::NDimArray, n_dim_index::NDimIndex, n_dim_indexer_u::NDimIndexerU, t_n_dim_indexer::TNDimIndexer}, utils::x_pow_dim_root_usize::x_pow_dim_root_usize};
 /// [NDimArray] with pre calculated [`NDimIndexerU`]
 pub type NDimChunk<T,const  DIM:usize>=NDimArray<&'static NDimIndexerU<DIM>,DIM,T,Vec<T>>;
 
@@ -62,7 +62,7 @@ pub fn get_cached_n_dim_indexer_u<const DIM:usize>(dim_elem_count:usize)->&'stat
 pub fn get_chunk_dim_elem_count<T,const DIM:usize>(chunk_size:usize)->(usize,usize){
     let size_of_t=std::mem::size_of::<T>();
     let chunk_count=chunk_size/size_of_t;
-    let (dim_elem_count,chunk_elem_count)=get_dim_root_of_x_usize(chunk_count,DIM);
+    let (dim_elem_count,chunk_elem_count)=x_pow_dim_root_usize(chunk_count,DIM);
     return (dim_elem_count,chunk_elem_count);
 }
 // #[cfg(test)]

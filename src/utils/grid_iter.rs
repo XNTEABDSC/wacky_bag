@@ -1,7 +1,7 @@
 //! [`GridIter`]
 
 use std::sync::{LazyLock, RwLock};
-use std::{collections::BinaryHeap, usize};
+use std::{collections::BinaryHeap};
 //use lazy_static::lazy_static;
 
 /// Enum grid position, by the order of the distance of grid's (i-0.5,j-0.5,1,1) closest point to (0,0)
