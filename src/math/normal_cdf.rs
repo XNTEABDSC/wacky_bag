@@ -4,7 +4,7 @@
 
 use std::sync::{LazyLock, RwLock};
 
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, clamp};
 use simba::scalar::RealField;
 
 use crate::collections::type_map::TypeMap;
@@ -21,7 +21,10 @@ pub const trait NormalCdfConsts<Marker>:Sized
 	/// Get Constants [`NormalCdfConstsData`] of `Self`
 	fn datas()->NormalCdfConstsData<Self>;
 }
-/// f64 consts in [https://www.johndcook.com/blog/cpp_phi/]
+
+/// `f64` consts in [https://www.johndcook.com/blog/cpp_phi/]
+/// 
+/// `clamp` to make sure 0<cdf<1 with 1e-8 error 
 pub const NORMAL_CDF_CONSTS_DATA_F64:NormalCdfConstsData<f64>=
 NormalCdfConstsData{
 	a1:0.254829592,
@@ -30,7 +33,9 @@ NormalCdfConstsData{
 	a4:-1.453152027,
 	a5:1.061405429,
 	p:0.3275911,
+	clamp:1e-8,
 };
+
 /// get [`NormalCdfConstsData`] via [FromPrimitive::from_f64]
 pub struct NormalCdfConstsByFromF64;
 
@@ -53,6 +58,7 @@ impl<T> NormalCdfConsts<NormalCdfConstsByFromF64> for T
 		}
 	}
 }
+
 /// Constants used for [`normal_cdf`]
 /// 
 /// see [`NORMAL_CDF_CONSTS_DATA_F64`] for sample.
@@ -65,7 +71,8 @@ pub struct NormalCdfConstsData<Num>
 	pub a3:Num,
 	pub a4:Num,
 	pub a5:Num,
-	pub p:Num
+	pub p:Num,
+	pub clamp:Num,
 }
 
 impl<Num> NormalCdfConstsData<Num> {
@@ -80,6 +87,7 @@ impl<Num> NormalCdfConstsData<Num> {
 			a4:f(&self.a4),
 			a5:f(&self.a5),
 			p:f(&self.p),
+			clamp:f(&self.clamp)
 		}
 	}
 	/// map
@@ -93,9 +101,11 @@ impl<Num> NormalCdfConstsData<Num> {
 			a4:f(self.a4),
 			a5:f(self.a5),
 			p:f(self.p),
+			clamp:f(self.clamp)
 		}
 	}
 }
+
 /// Calculates normal cdf.
 /// 
 /// implemented via [https://www.johndcook.com/blog/cpp_phi/].
@@ -106,7 +116,7 @@ pub fn normal_cdf<Num,Marker>(x:Num)->Num
 {
 	
 	let v=<Num as NormalCdfConsts<Marker>>::datas();
-	let NormalCdfConstsData{a1,a2,a3,a4,a5,p}=v;
+	let NormalCdfConstsData{a1,a2,a3,a4,a5,p,clamp:clamp_}=v;
 	let two=Num::one()+Num::one();
     let sign = x.signum();
     // let x2=x.abs()*Num::FRAC_1_SQRT_2;
@@ -114,10 +124,17 @@ pub fn normal_cdf<Num,Marker>(x:Num)->Num
 
     let t= Num::one()/(Num::one()+p*x2);
     let y=Num::one()-(((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*Num::exp(-x2*x2);
-    return (Num::one()+sign*y)/two;
+	let res=(Num::one()+sign*y)/two;
+	let res = clamp(res, clamp_, Num::one()-clamp_);
+    return res;
 }
-/// Test [normal_cdf] for `Num`
-pub fn test_normal_cdf<Num,Marker>()->[Num;5]
+
+/// Test [normal_cdf] for `Num`, returning error
+/// 
+/// Tested with Num=f64, error < 1e-7
+/// 
+/// Tested elsewhere with Num=simba::scalar::FixedI32F32, error < 1e-7
+pub fn test_normal_cdf_errors<Num,Marker>()->[Num;5]
 	where Num:RealField+Copy+NormalCdfConsts<Marker>
 {
 	let xs=[
@@ -133,11 +150,16 @@ pub fn test_normal_cdf<Num,Marker>()->[Num;5]
 	// return v.max_by(|a,b|a.partial_cmp(b).unwrap()).unwrap();
 	return v;
 }
+
 #[cfg(test)]
 mod test{
 	use super::*;
 	#[test]
 	fn test_normal_cdf_f64(){
-		println!("{:?}",test_normal_cdf::<f64,_>());
+		// println!("{:?}",test_normal_cdf::<f64,_>());
+		let res=test_normal_cdf_errors::<f64,_>();
+		for i in res {
+			assert!(i<1e-7);
+		}
 	}
 }
