@@ -8,6 +8,7 @@
 pub mod scope_no_ret;
 // pub mod mapper;
 pub mod single_func;
+pub mod as_iter;
 // pub mod new_type_class;
 // pub mod scope2;
 // pub mod scope3;

@@ -18,6 +18,7 @@ pub mod d_sphere_volume;
 pub mod rw_lock_error_either;
 // pub mod h_h_zippable;
 pub mod phantom_data_type_params;
+pub mod fn_as_index;
 // pub mod vec_chunk_drain;
 
 
